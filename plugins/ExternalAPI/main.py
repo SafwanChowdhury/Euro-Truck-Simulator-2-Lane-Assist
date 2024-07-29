@@ -64,22 +64,25 @@ async def websocket_handler(websocket, path):
 async def start_server():
     global server, stop_event
     stop_event = asyncio.Event()
-    server = await websockets.serve(websocket_handler, "0.0.0.0", port)
+    server = await websockets.serve(
+        websocket_handler, 
+        "0.0.0.0", 
+        port, 
+        process_request=process_request
+    )
     print(f"WebSocket server started on ws://0.0.0.0:{port}")
     await stop_event.wait()
 
 async def process_request(path, headers):
-    if "Sec-WebSocket-Key" in headers:
-        key = headers["Sec-WebSocket-Key"]
-        accept_key = generate_accept_key(key)
+    if "Upgrade" in headers and headers["Upgrade"].lower() == "websocket":
         return {
             "status": 101,
             "headers": [
                 ("Upgrade", "websocket"),
                 ("Connection", "Upgrade"),
-                ("Sec-WebSocket-Accept", accept_key),
             ]
         }
+    return None  # Return None to let websockets handle the request normally
 
 def run_server():
     asyncio.set_event_loop(asyncio.new_event_loop())
