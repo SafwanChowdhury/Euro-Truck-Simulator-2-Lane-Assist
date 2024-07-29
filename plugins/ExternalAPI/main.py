@@ -7,6 +7,7 @@ If you need to make a panel that is only updated when it's open then check the P
 from plugins.plugin import PluginInformation
 from src.logger import print
 
+
 PluginInfo = PluginInformation(
     name="ExternalAPI", # This needs to match the folder name under plugins (this would mean plugins\Plugin\main.py)
     description="Will post the application data to\nlocalhost:39847\nUsed for external applications.",
@@ -17,6 +18,7 @@ PluginInfo = PluginInformation(
     dynamicOrder="last" # Will run the plugin before anything else in the mainloop (data will be empty)
 )
 
+import threading
 import tkinter as tk
 from tkinter import ttk
 import src.helpers as helpers
@@ -27,56 +29,18 @@ import os
 import json
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import threading
+import asyncio
+import websockets
 import numpy as np
+from src.logger import print
 
-url = "0.0.0.0"
 port = settings.GetSettings("ExternalAPI", "port")
-
-if port == None:
+if port is None:
     settings.CreateSettings("ExternalAPI", "port", 39847)
     port = 39847
 
 currentData = {}
 close = False
-
-# Send the data variable to the external application
-class HttpHandler(BaseHTTPRequestHandler):
-    global currentData
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header("Content-type", "application/json")
-        self.send_header("Content-length", len(json.dumps(currentData)))
-        self.end_headers()
-        self.wfile.write(bytes(json.dumps(currentData), "utf-8"))
-        
-    # Disable logging
-    def log_message(self, format, *args):
-        return
-
-def ServerThread():
-    global close
-    global server
-    
-    while not close:
-        try:
-            server.handle_request()
-        except:
-            pass
-        time.sleep(0.1) # 10fps
-
-
-def CreateServer():
-    print("Starting server")
-    global server
-    global serverThread
-    server = HTTPServer((url, port), HttpHandler)
-    server.timeout = 0.1
-    
-    serverThread = threading.Thread(target=ServerThread)
-    serverThread.start()
-    
 
 def convert_ndarrays(obj):
     if isinstance(obj, np.ndarray):
@@ -88,10 +52,27 @@ def convert_ndarrays(obj):
     else:
         return obj
 
+async def websocket_handler(websocket, path):
+    global currentData, close
+    try:
+        while not close:
+            try:
+                await websocket.send(json.dumps(currentData))
+                await asyncio.sleep(0.1)  # 10fps
+            except websockets.exceptions.ConnectionClosed:
+                break
+    finally:
+        await websocket.close()
+
+def start_server():
+    global server
+    server = websockets.serve(websocket_handler, "0.0.0.0", port)
+    asyncio.get_event_loop().run_until_complete(server)
+    print(f"WebSocket server started on ws://0.0.0.0:{port}")
+    
 def plugin(data):
     global currentData
     tempData = {}
-    # Go though the data and if there are any ndarrays then convert them to lists
     for key in data:
         if key == "frame" or key == "frameFull":
             tempData[key] = "too large to send"
@@ -105,24 +86,18 @@ def plugin(data):
         
         tempData[key] = data[key]
 
-
     currentData = convert_ndarrays(tempData)
-    return data # Plugins need to ALWAYS return the data
+    return data
 
-
-# Plugins need to all also have the onEnable and onDisable functions
 def onEnable():
-    CreateServer()
-    pass
+    start_server()
+    asyncio.get_event_loop().run_forever()
 
 def onDisable():
     global close
-    global serverThread
-    
     close = True
-    serverThread.join()
-    
-    pass
+    server.close()
+
 
 class UI():
     try: # The panel is in a try loop so that the logger can log errors if they occur
