@@ -26,6 +26,8 @@ import json
 import asyncio
 import websockets
 import numpy as np
+import base64
+import hashlib
 from src.logger import print
 
 port = settings.GetSettings("ExternalAPI", "port")
@@ -50,6 +52,7 @@ def convert_ndarrays(obj):
 
 async def websocket_handler(websocket, path):
     global currentData, stop_event
+    print(f"New connection from {websocket.remote_address}")
     try:
         while not stop_event.is_set():
             try:
@@ -58,14 +61,38 @@ async def websocket_handler(websocket, path):
             except websockets.exceptions.ConnectionClosed:
                 break
     finally:
+        print(f"Connection closed for {websocket.remote_address}")
         await websocket.close()
+
+def generate_accept_key(key):
+    GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+    hash = hashlib.sha1((key + GUID).encode()).digest()
+    return base64.b64encode(hash).decode()
 
 async def start_server():
     global server, stop_event
     stop_event = asyncio.Event()
-    server = await websockets.serve(websocket_handler, "0.0.0.0", port)
+    server = await websockets.serve(
+        websocket_handler, 
+        "0.0.0.0", 
+        port, 
+        process_request=process_request
+    )
     print(f"WebSocket server started on ws://0.0.0.0:{port}")
     await stop_event.wait()
+
+async def process_request(path, headers):
+    if "Sec-WebSocket-Key" in headers:
+        key = headers["Sec-WebSocket-Key"]
+        accept_key = generate_accept_key(key)
+        return {
+            "status": 101,
+            "headers": [
+                ("Upgrade", "websocket"),
+                ("Connection", "Upgrade"),
+                ("Sec-WebSocket-Accept", accept_key),
+            ]
+        }
 
 def run_server():
     asyncio.set_event_loop(asyncio.new_event_loop())
