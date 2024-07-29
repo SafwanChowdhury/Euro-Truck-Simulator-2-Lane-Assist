@@ -66,10 +66,13 @@ async def websocket_handler(websocket, path):
 
 def start_server():
     global server
-    server = websockets.serve(websocket_handler, "0.0.0.0", port)
-    asyncio.get_event_loop().run_until_complete(server)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    start_server = websockets.serve(websocket_handler, "0.0.0.0", port)
+    server = loop.run_until_complete(start_server)
     print(f"WebSocket server started on ws://0.0.0.0:{port}")
-    
+    loop.run_forever()
+
 def plugin(data):
     global currentData
     tempData = {}
@@ -90,14 +93,15 @@ def plugin(data):
     return data
 
 def onEnable():
-    start_server()
-    asyncio.get_event_loop().run_forever()
+    global server_thread
+    server_thread = threading.Thread(target=start_server)
+    server_thread.start()
 
 def onDisable():
-    global close
+    global close, server, server_thread
     close = True
-    server.close()
-
+    asyncio.get_event_loop().call_soon_threadsafe(server.close)
+    server_thread.join()
 
 class UI():
     try: # The panel is in a try loop so that the logger can log errors if they occur
