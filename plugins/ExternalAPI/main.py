@@ -26,8 +26,6 @@ import json
 import asyncio
 import websockets
 import numpy as np
-import base64
-import hashlib
 from src.logger import print
 
 port = settings.GetSettings("ExternalAPI", "port")
@@ -62,22 +60,11 @@ async def websocket_handler(websocket, path):
                 break
     finally:
         print(f"Connection closed for {websocket.remote_address}")
-        await websocket.close()
-
-def generate_accept_key(key):
-    GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-    hash = hashlib.sha1((key + GUID).encode()).digest()
-    return base64.b64encode(hash).decode()
 
 async def start_server():
     global server, stop_event
     stop_event = asyncio.Event()
-    server = await websockets.serve(
-        websocket_handler, 
-        "0.0.0.0", 
-        port, 
-        process_request=process_request
-    )
+    server = await websockets.serve(websocket_handler, "0.0.0.0", port)
     print(f"WebSocket server started on ws://0.0.0.0:{port}")
     await stop_event.wait()
 
