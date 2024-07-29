@@ -21,14 +21,8 @@ PluginInfo = PluginInformation(
 import threading
 import tkinter as tk
 from tkinter import ttk
-import src.helpers as helpers
-import src.mainUI as mainUI
-import src.variables as variables
 import src.settings as settings
-import os
 import json
-import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import asyncio
 import websockets
 import numpy as np
@@ -40,7 +34,9 @@ if port is None:
     port = 39847
 
 currentData = {}
-close = False
+server = None
+server_task = None
+stop_event = None
 
 def convert_ndarrays(obj):
     if isinstance(obj, np.ndarray):
@@ -53,9 +49,9 @@ def convert_ndarrays(obj):
         return obj
 
 async def websocket_handler(websocket, path):
-    global currentData, close
+    global currentData, stop_event
     try:
-        while not close:
+        while not stop_event.is_set():
             try:
                 await websocket.send(json.dumps(currentData))
                 await asyncio.sleep(0.1)  # 10fps
@@ -64,14 +60,17 @@ async def websocket_handler(websocket, path):
     finally:
         await websocket.close()
 
-def start_server():
-    global server
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    start_server = websockets.serve(websocket_handler, "0.0.0.0", port)
-    server = loop.run_until_complete(start_server)
+async def start_server():
+    global server, stop_event
+    stop_event = asyncio.Event()
+    server = await websockets.serve(websocket_handler, "0.0.0.0", port)
     print(f"WebSocket server started on ws://0.0.0.0:{port}")
-    loop.run_forever()
+    await stop_event.wait()
+
+def run_server():
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_server())
 
 def plugin(data):
     global currentData
@@ -93,15 +92,22 @@ def plugin(data):
     return data
 
 def onEnable():
-    global server_thread
-    server_thread = threading.Thread(target=start_server)
-    server_thread.start()
+    global server_task
+    if server_task is None or not server_task.is_alive():
+        server_task = threading.Thread(target=run_server)
+        server_task.start()
+    else:
+        print("WebSocket server is already running")
 
 def onDisable():
-    global close, server, server_thread
-    close = True
-    asyncio.get_event_loop().call_soon_threadsafe(server.close)
-    server_thread.join()
+    global stop_event, server, server_task
+    if stop_event:
+        asyncio.run(stop_event.set())
+    if server:
+        server.close()
+    if server_task and server_task.is_alive():
+        server_task.join()
+    print("WebSocket server stopped")
 
 class UI():
     try: # The panel is in a try loop so that the logger can log errors if they occur
