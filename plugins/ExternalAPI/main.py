@@ -48,65 +48,46 @@ def convert_ndarrays(obj):
     else:
         return obj
 
-async def websocket_handler(websocket, path):
+async def handle_client(reader, writer):
     global currentData, stop_event
-    print(f"New connection from {websocket.remote_address}")
+    addr = writer.get_extra_info('peername')
+    print(f"New connection from {addr}")
     try:
         while not stop_event.is_set():
             try:
-                await websocket.send(json.dumps(currentData))
+                message = json.dumps(currentData)
+                writer.write(message.encode() + b'\n')
+                await writer.drain()
                 await asyncio.sleep(0.1)  # 10fps
-            except websockets.exceptions.ConnectionClosed:
+            except Exception as e:
+                print(f"Error sending data to {addr}: {e}")
                 break
     finally:
-        print(f"Connection closed for {websocket.remote_address}")
+        print(f"Connection closed for {addr}")
+        writer.close()
+        await writer.wait_closed()
 
 async def start_server():
     global server, stop_event
     stop_event = asyncio.Event()
-    server = await websockets.serve(
-        websocket_handler, 
-        "0.0.0.0", 
-        port, 
-        process_request=process_request
-    )
-    print(f"WebSocket server started on ws://0.0.0.0:{port}")
-    await stop_event.wait()
-
-async def process_request(path, headers):
-    if "Upgrade" in headers and headers["Upgrade"].lower() == "websocket":
-        return {
-            "status": 101,
-            "headers": [
-                ("Upgrade", "websocket"),
-                ("Connection", "Upgrade"),
-            ]
-        }
-    return None  # Return None to let websockets handle the request normally
+    try:
+        server = await asyncio.start_server(handle_client, '0.0.0.0', port, reuse_address=True)
+        print(f"Server started on 0.0.0.0:{port}")
+        async with server:
+            await stop_event.wait()
+    except OSError as e:
+        print(f"Error starting server: {e}")
+        print("Try changing the port in the settings if this persists.")
 
 def run_server():
     asyncio.set_event_loop(asyncio.new_event_loop())
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_server())
-
-def plugin(data):
-    global currentData
-    tempData = {}
-    for key in data:
-        if key == "frame" or key == "frameFull":
-            tempData[key] = "too large to send"
-            continue
-        
-        if key == "GPS":
-            from plugins.Map.GameData.roads import RoadToJson
-            tempData[key] = data[key]
-            tempData[key]["roads"] = [RoadToJson(road) for road in data[key]["roads"]]
-            continue
-        
-        tempData[key] = data[key]
-
-    currentData = convert_ndarrays(tempData)
-    return data
+    try:
+        loop.run_until_complete(start_server())
+    except Exception as e:
+        print(f"Error in run_server: {e}")
+    finally:
+        loop.close()
 
 def onEnable():
     global server_task
@@ -114,7 +95,7 @@ def onEnable():
         server_task = threading.Thread(target=run_server)
         server_task.start()
     else:
-        print("WebSocket server is already running")
+        print("Server is already running")
 
 def onDisable():
     global stop_event, server, server_task
@@ -123,8 +104,10 @@ def onDisable():
     if server:
         server.close()
     if server_task and server_task.is_alive():
-        server_task.join()
-    print("WebSocket server stopped")
+        server_task.join(timeout=5)  # Wait up to 5 seconds for the thread to finish
+        if server_task.is_alive():
+            print("Warning: Server thread did not stop cleanly")
+    print("Server stopped")
 
 class UI():
     try: # The panel is in a try loop so that the logger can log errors if they occur
