@@ -57,7 +57,7 @@ async def handle_client(reader, writer):
                 message = json.dumps(currentData)
                 writer.write(message.encode() + b'\n')
                 await writer.drain()
-                await asyncio.sleep(0.1)  # 10fps
+                await asyncio.sleep(0.033) # 30 FPS
             except Exception as e:
                 print(f"Error sending data to {addr}: {e}")
                 break
