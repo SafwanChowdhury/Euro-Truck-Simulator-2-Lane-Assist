@@ -7,7 +7,6 @@ If you need to make a panel that is only updated when it's open then check the P
 from plugins.plugin import PluginInformation
 from src.logger import print
 
-
 PluginInfo = PluginInformation(
     name="ExternalAPI", # This needs to match the folder name under plugins (this would mean plugins\Plugin\main.py)
     description="Will post the application data to\nlocalhost:39847\nUsed for external applications.",
@@ -18,15 +17,15 @@ PluginInfo = PluginInformation(
     dynamicOrder="last" # Will run the plugin before anything else in the mainloop (data will be empty)
 )
 
-import threading
 import tkinter as tk
 from tkinter import ttk
 import src.settings as settings
+import time
+import threading
+import numpy as np
 import json
 import asyncio
 import websockets
-import numpy as np
-from src.logger import print
 
 port = settings.GetSettings("ExternalAPI", "port")
 if port is None:
@@ -108,6 +107,26 @@ def onDisable():
         if server_task.is_alive():
             print("Warning: Server thread did not stop cleanly")
     print("Server stopped")
+
+def plugin(data):
+    global currentData
+    tempData = {}
+    # Go through the data and if there are any ndarrays then convert them to lists
+    for key in data:
+        if key == "frame" or key == "frameFull":
+            tempData[key] = "too large to send"
+            continue
+        
+        if key == "GPS":
+            from plugins.Map.GameData.roads import RoadToJson
+            tempData[key] = data[key]
+            tempData[key]["roads"] = [RoadToJson(road) for road in data[key]["roads"]]
+            continue
+        
+        tempData[key] = data[key]
+
+    currentData = convert_ndarrays(tempData)
+    return data # Plugins need to ALWAYS return the data
 
 class UI():
     try: # The panel is in a try loop so that the logger can log errors if they occur
