@@ -112,6 +112,10 @@ def plugin(data):
             "truckPlacement": {
                 "coordinateX": 0.0,
                 "coordinateZ": 0.0
+            },
+            "truckVector": {
+                "velocityX": 0.0,
+                "velocityZ": 0.0
             }
         }
     }
@@ -125,6 +129,11 @@ def plugin(data):
             tempData["api"]["truckPlacement"]["coordinateX"] = data[key].get("x", 0.0)
             tempData["api"]["truckPlacement"]["coordinateZ"] = data[key].get("z", 0.0)
             tempData["api"]["roads"] = [RoadToJson(road) for road in data[key].get("roads", [])]
+            continue
+        
+        if key == "api" and "truckVector" in data[key]:
+            tempData["api"]["truckVector"]["velocityX"] = data[key]["truckVector"].get("lv_accelerationX", 0.0)
+            tempData["api"]["truckVector"]["velocityZ"] = data[key]["truckVector"].get("lv_accelerationZ", 0.0)
             continue
         
         tempData[key] = convert_ndarrays(data[key])
