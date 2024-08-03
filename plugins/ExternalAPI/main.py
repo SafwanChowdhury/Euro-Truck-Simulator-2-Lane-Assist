@@ -114,16 +114,19 @@ def plugin(data):
             tempData["api"]["roads"] = [RoadToJson(road) for road in data[key].get("roads", [])]
             continue
         
-        if key == "api" and "truckVector" in data[key]:
-            tempData["api"]["truckVector"]["velocityX"] = data[key]["truckVector"].get("lv_accelerationX", 0.0)
-            tempData["api"]["truckVector"]["velocityZ"] = data[key]["truckVector"].get("lv_accelerationZ", 0.0)
+        if key == "api":
+            if "truckPlacement" in data[key]:
+                tempData["api"]["truckPlacement"]["coordinateX"] = data[key]["truckPlacement"].get("coordinateX", 0.0)
+                tempData["api"]["truckPlacement"]["coordinateZ"] = data[key]["truckPlacement"].get("coordinateZ", 0.0)
+            if "truckVector" in data[key]:
+                tempData["api"]["truckVector"]["velocityX"] = data[key]["truckVector"].get("lv_accelerationX", 0.0)
+                tempData["api"]["truckVector"]["velocityZ"] = data[key]["truckVector"].get("lv_accelerationZ", 0.0)
             continue
         
         tempData[key] = convert_ndarrays(data[key])
-
+    
     currentData = tempData
     return data
-
 
 # Plugins need to all also have the onEnable and onDisable functions
 def onEnable():
