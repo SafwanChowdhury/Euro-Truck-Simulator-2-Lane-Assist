@@ -30,7 +30,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
 import numpy as np
 
-url = "localhost"
+url = "0.0.0.0"
 port = settings.GetSettings("ExternalAPI", "port")
 
 if port == None:

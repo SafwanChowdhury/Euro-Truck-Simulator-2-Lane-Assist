@@ -12,6 +12,7 @@ torchaudio
 matplotlib
 setuptools
 tkwebview2
+websockets
 GitPython
 PyAutoGUI
 pywebview
