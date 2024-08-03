@@ -30,7 +30,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
 import numpy as np
 
-url = "0.0.0.0"
+url = "localhost"
 port = settings.GetSettings("ExternalAPI", "port")
 
 if port == None:
@@ -90,43 +90,25 @@ def convert_ndarrays(obj):
 
 def plugin(data):
     global currentData
-    tempData = {
-        "api": {
-            "truckPlacement": {
-                "coordinateX": 0.0,
-                "coordinateZ": 0.0
-            },
-            "truckVector": {
-                "velocityX": 0.0,
-                "velocityZ": 0.0
-            }
-        }
-    }
-    
+    tempData = {}
+    # Go though the data and if there are any ndarrays then convert them to lists
     for key in data:
         if key == "frame" or key == "frameFull":
+            tempData[key] = "too large to send"
             continue
         
         if key == "GPS":
             from plugins.Map.GameData.roads import RoadToJson
-            tempData["api"]["truckPlacement"]["coordinateX"] = data[key].get("x", 0.0)
-            tempData["api"]["truckPlacement"]["coordinateZ"] = data[key].get("z", 0.0)
-            tempData["api"]["roads"] = [RoadToJson(road) for road in data[key].get("roads", [])]
+            tempData[key] = data[key]
+            tempData[key]["roads"] = [RoadToJson(road) for road in data[key]["roads"]]
             continue
         
-        if key == "api":
-            if "truckPlacement" in data[key]:
-                tempData["api"]["truckPlacement"]["coordinateX"] = data[key]["truckPlacement"].get("coordinateX", 0.0)
-                tempData["api"]["truckPlacement"]["coordinateZ"] = data[key]["truckPlacement"].get("coordinateZ", 0.0)
-            if "truckVector" in data[key]:
-                tempData["api"]["truckVector"]["velocityX"] = data[key]["truckVector"].get("lv_accelerationX", 0.0)
-                tempData["api"]["truckVector"]["velocityZ"] = data[key]["truckVector"].get("lv_accelerationZ", 0.0)
-            continue
-        
-        tempData[key] = convert_ndarrays(data[key])
-    
-    currentData = tempData
-    return data
+        tempData[key] = data[key]
+
+
+    currentData = convert_ndarrays(tempData)
+    return data # Plugins need to ALWAYS return the data
+
 
 # Plugins need to all also have the onEnable and onDisable functions
 def onEnable():
