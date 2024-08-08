@@ -8,10 +8,10 @@ from plugins.plugin import PluginInformation
 from src.logger import print
 
 PluginInfo = PluginInformation(
-    name="ExternalAPI", # This needs to match the folder name under plugins (this would mean plugins\Plugin\main.py)
-    description="Will post the application data to\nlocalhost:39847\nUsed for external applications.",
+    name="ExternalAPI-Socket", # This needs to match the folder name under plugins (this would mean plugins\Plugin\main.py)
+    description="Will send application data to connected client over websockets. Used for external applications.",
     version="0.1",
-    author="Tumppi066",
+    author="Tumppi066 & SafwanChowdhury",
     url="https://github.com/Tumppi066/Euro-Truck-Simulator-2-Lane-Assist",
     type="dynamic", # = Panel
     dynamicOrder="last" # Will run the plugin before anything else in the mainloop (data will be empty)
@@ -19,64 +19,20 @@ PluginInfo = PluginInformation(
 
 import tkinter as tk
 from tkinter import ttk
-import src.helpers as helpers
-import src.mainUI as mainUI
-import src.variables as variables
 import src.settings as settings
-import os
-import json
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
 import numpy as np
+import json
+import asyncio
+import websockets
 
-url = "0.0.0.0"
-port = settings.GetSettings("ExternalAPI", "port")
-
-if port == None:
-    settings.CreateSettings("ExternalAPI", "port", 39847)
-    port = 39847
+port = 39846
 
 currentData = {}
-close = False
-
-# Send the data variable to the external application
-class HttpHandler(BaseHTTPRequestHandler):
-    global currentData
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header("Content-type", "application/json")
-        self.send_header("Content-length", len(json.dumps(currentData)))
-        self.end_headers()
-        self.wfile.write(bytes(json.dumps(currentData), "utf-8"))
-        
-    # Disable logging
-    def log_message(self, format, *args):
-        return
-
-def ServerThread():
-    global close
-    global server
-    
-    while not close:
-        try:
-            server.handle_request()
-        except:
-            pass
-        time.sleep(0.1) # 10fps
-
-
-def CreateServer():
-    print("Starting server")
-    global server
-    global serverThread
-    server = HTTPServer((url, port), HttpHandler)
-    server.timeout = 0.1
-    
-    serverThread = threading.Thread(target=ServerThread)
-    serverThread.start()
-    
+server = None
+server_task = None
+stop_event = None
 
 def convert_ndarrays(obj):
     if isinstance(obj, np.ndarray):
@@ -87,6 +43,67 @@ def convert_ndarrays(obj):
         return [convert_ndarrays(value) for value in obj]
     else:
         return obj
+
+async def handle_client(reader, writer):
+    global currentData, stop_event
+    addr = writer.get_extra_info('peername')
+    print(f"New connection from {addr}")
+    try:
+        while not stop_event.is_set():
+            try:
+                message = json.dumps(currentData)
+                writer.write(message.encode() + b'\n')
+                await writer.drain()
+                await asyncio.sleep(0.033) # 30 FPS
+            except Exception as e:
+                print(f"Error sending data to {addr}: {e}")
+                break
+    finally:
+        print(f"Connection closed for {addr}")
+        writer.close()
+        await writer.wait_closed()
+
+async def start_server():
+    global server, stop_event
+    stop_event = asyncio.Event()
+    try:
+        server = await asyncio.start_server(handle_client, '0.0.0.0', port, reuse_address=True)
+        print(f"Server started on 0.0.0.0:{port}")
+        async with server:
+            await stop_event.wait()
+    except OSError as e:
+        print(f"Error starting server: {e}")
+        print("Try changing the port in the settings if this persists.")
+
+def run_server():
+    asyncio.set_event_loop(asyncio.new_event_loop())
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(start_server())
+    except Exception as e:
+        print(f"Error in run_server: {e}")
+    finally:
+        loop.close()
+
+def onEnable():
+    global server_task
+    if server_task is None or not server_task.is_alive():
+        server_task = threading.Thread(target=run_server)
+        server_task.start()
+    else:
+        print("Server is already running")
+
+def onDisable():
+    global stop_event, server, server_task
+    if stop_event:
+        asyncio.run(stop_event.set())
+    if server:
+        server.close()
+    if server_task and server_task.is_alive():
+        server_task.join(timeout=5)  # Wait up to 5 seconds for the thread to finish
+        if server_task.is_alive():
+            print("Warning: Server thread did not stop cleanly")
+    print("Server stopped")
 
 def plugin(data):
     global currentData
@@ -127,20 +144,6 @@ def plugin(data):
     
     currentData = tempData
     return data
-
-# Plugins need to all also have the onEnable and onDisable functions
-def onEnable():
-    CreateServer()
-    pass
-
-def onDisable():
-    global close
-    global serverThread
-    
-    close = True
-    serverThread.join()
-    
-    pass
 
 class UI():
     try: # The panel is in a try loop so that the logger can log errors if they occur
