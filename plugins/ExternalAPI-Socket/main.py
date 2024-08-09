@@ -56,17 +56,17 @@ async def handle_client(reader, writer):
                     break
                 message = data.decode().strip()
                 
-                # Parse the received JSON data
+                # Parse and print the received JSON data
                 try:
                     received_json = json.loads(message)
-                    currentData['received_json'] = json.dumps(received_json)
+                    print("Received JSON data:")
+                    print(json.dumps(received_json, indent=2))
                 except json.JSONDecodeError:
                     print(f"Error decoding JSON from {addr}: {message}")
                 
                 response = json.dumps(currentData)
                 writer.write(response.encode() + b'\n')
                 await writer.drain()
-                await asyncio.sleep(0.033) # 30 FPS
             except Exception as e:
                 print(f"Error handling data from {addr}: {e}")
                 break
@@ -74,6 +74,7 @@ async def handle_client(reader, writer):
         print(f"Connection closed for {addr}")
         writer.close()
         await writer.wait_closed()
+
 
 async def start_server():
     global server, stop_event
@@ -156,14 +157,6 @@ def plugin(data):
         tempData[key] = convert_ndarrays(data[key])
     
     currentData = tempData
-    
-    try:
-        received_json = json.loads(data.get('received_json', '{}'))
-        print("Received JSON data:")
-        print(json.dumps(received_json, indent=2))
-    except json.JSONDecodeError:
-        print("Error decoding JSON data")
-    
     return data
 
 class UI():
