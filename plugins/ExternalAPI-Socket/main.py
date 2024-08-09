@@ -49,31 +49,41 @@ async def handle_client(reader, writer):
     addr = writer.get_extra_info('peername')
     print(f"New connection from {addr}")
     try:
-        while not stop_event.is_set():
-            try:
-                data = await reader.readline()
-                if not data:
-                    break
-                message = data.decode().strip()
-                
-                # Parse and print the received JSON data
-                try:
-                    received_json = json.loads(message)
-                    print("Received JSON data:")
-                    print(json.dumps(received_json, indent=2))
-                except json.JSONDecodeError:
-                    print(f"Error decoding JSON from {addr}: {message}")
-                
-                response = json.dumps(currentData)
-                writer.write(response.encode() + b'\n')
-                await writer.drain()
-            except Exception as e:
-                print(f"Error handling data from {addr}: {e}")
-                break
+        send_task = asyncio.create_task(send_data(writer))
+        receive_task = asyncio.create_task(receive_data(reader))
+        await asyncio.gather(send_task, receive_task)
     finally:
         print(f"Connection closed for {addr}")
         writer.close()
         await writer.wait_closed()
+
+async def send_data(writer):
+    global currentData, stop_event
+    try:
+        while not stop_event.is_set():
+            message = json.dumps(currentData)
+            writer.write(message.encode() + b'\n')
+            await writer.drain()
+            await asyncio.sleep(0.033)  # 30 FPS
+    except Exception as e:
+        print(f"Error sending data: {e}")
+
+async def receive_data(reader):
+    global stop_event
+    try:
+        while not stop_event.is_set():
+            data = await reader.readline()
+            if not data:
+                break
+            message = data.decode().strip()
+            try:
+                received_json = json.loads(message)
+                print("Received JSON data:")
+                print(json.dumps(received_json, indent=2))
+            except json.JSONDecodeError:
+                print(f"Error decoding JSON: {message}")
+    except Exception as e:
+        print(f"Error receiving data: {e}")
 
 
 async def start_server():
