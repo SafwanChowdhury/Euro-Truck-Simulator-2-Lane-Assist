@@ -31,6 +31,7 @@ port = 39846
 
 
 currentData = {}
+received_json = {}
 server = None
 server_task = None
 stop_event = None
@@ -70,7 +71,7 @@ async def send_data(writer):
         print(f"Error sending data: {e}")
 
 async def receive_data(reader):
-    global stop_event
+    global stop_event, received_json
     try:
         while not stop_event.is_set():
             data = await reader.readline()
@@ -79,14 +80,6 @@ async def receive_data(reader):
             message = data.decode().strip()
             try:
                 received_json = json.loads(message)
-                # print("\nReceived Truck Data:")
-                # print("-" * 30)
-                # print(f"Position: (x: {received_json['position']['x']:.2f}, y: {received_json['position']['y']:.2f})")
-                # print(f"Velocity: (x: {received_json['velocity']['x']:.2f}, y: {received_json['velocity']['y']:.2f})")
-                # print(f"Acceleration: {received_json['acceleration']:.2f}")
-                # print(f"Turn Angle: {received_json['turn_angle']:.2f}")
-                # print(f"Next Speed: {received_json['next_speed']:.2f}")
-                # print("-" * 30)
             except json.JSONDecodeError:
                 print(f"Error decoding JSON: {message}")
             except KeyError as e:
@@ -137,7 +130,7 @@ def onDisable():
     print("Server stopped")
 
 def plugin(data):
-    global currentData
+    global currentData, received_json
     tempData = {
         "api": {
             "truckPlacement": {
@@ -174,6 +167,8 @@ def plugin(data):
         tempData[key] = convert_ndarrays(data[key])
     
     currentData = tempData
+    data["gbpData"] = {}
+    data["gbpData"]["receivedJSON"] = received_json
     return data
 
 class UI():
