@@ -89,29 +89,36 @@ def plugin(data):
     last_width_frame, last_height_frame = width_frame, height_frame
 
     frame = frame_original.copy()
-    print(data)
-    if "externalapi" in data:
+
+    # Check if the required data is available
+    if "externalapi" in data and "receivedJSON" in data["externalapi"]:
         received_json = data["externalapi"]["receivedJSON"]
+        
+        if received_json and isinstance(received_json, dict):
+            position = received_json.get('position', {})
+            velocity = received_json.get('velocity', {})
+            
+            position_x = position.get('x', 0)
+            position_y = position.get('y', 0)
+            velocity_x = velocity.get('x', 0)
+            velocity_y = velocity.get('y', 0)
+            acceleration = received_json.get('acceleration', 0)
+            turn_angle = received_json.get('turn_angle', 0)
+            next_speed = received_json.get('next_speed', 0)
 
-        position_x = received_json.get('position', {}).get('x', 0)
-        position_y = received_json.get('position', {}).get('y', 0)
-        velocity_x = received_json.get('velocity', {}).get('x', 0)
-        velocity_y = received_json.get('velocity', {}).get('y', 0)
-        acceleration = received_json.get('acceleration', 0)
-        turn_angle = received_json.get('turn_angle', 0)
-        next_speed = received_json.get('next_speed', 0)
-
-        draw_text(frame, "Position X:", 0.1, 0.2, position_x)
-        draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
-        draw_text(frame, "Velocity X:", 0.1, 0.4, velocity_x)
-        draw_text(frame, "Velocity Y:", 0.1, 0.5, velocity_y)
-        draw_text(frame, "Acceleration:", 0.1, 0.6, acceleration)
-        draw_text(frame, "Turn Angle:", 0.1, 0.7, turn_angle)
-        draw_text(frame, "Next Speed:", 0.1, 0.8, next_speed)
-
+            draw_text(frame, "Position X:", 0.1, 0.2, position_x)
+            draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
+            draw_text(frame, "Velocity X:", 0.1, 0.4, velocity_x)
+            draw_text(frame, "Velocity Y:", 0.1, 0.5, velocity_y)
+            draw_text(frame, "Acceleration:", 0.1, 0.6, acceleration)
+            draw_text(frame, "Turn Angle:", 0.1, 0.7, turn_angle)
+            draw_text(frame, "Next Speed:", 0.1, 0.8, next_speed)
+        else:
+            cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
     else:
         cv2.putText(frame, "Waiting for GBPPlanner data...", (int(0.1*width_frame), int(0.5*height_frame)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, text_color, 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
 
     cv2.imshow(name_window, frame)
 
