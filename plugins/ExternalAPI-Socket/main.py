@@ -65,7 +65,6 @@ async def send_data(writer):
             message = json.dumps(currentData)
             writer.write(message.encode() + b'\n')
             await writer.drain()
-            print("Data Sent")
             await asyncio.sleep(0.033)  # 30 FPS
     except Exception as e:
         print(f"Error sending data: {e}")
@@ -80,7 +79,6 @@ async def receive_data(reader):
             message = data.decode().strip()
             try:
                 received_json = json.loads(message)
-                print("Data Recieved")
                 # print("\nReceived Truck Data:")
                 # print("-" * 30)
                 # print(f"Position: (x: {received_json['position']['x']:.2f}, y: {received_json['position']['y']:.2f})")
