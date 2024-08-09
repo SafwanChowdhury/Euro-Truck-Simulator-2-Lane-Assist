@@ -169,6 +169,7 @@ def plugin(data):
     currentData = tempData
     data["externalapi"] = {}
     data["externalapi"]["receivedJSON"] = received_json
+    print(received_json)
     return data
 
 class UI():
