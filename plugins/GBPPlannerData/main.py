@@ -5,6 +5,9 @@ import win32gui, win32con
 from ctypes import windll, byref, c_int, sizeof
 import tkinter as tk
 from tkinter import ttk
+import src.helpers as helpers
+import src.settings as settings
+from src.translator import Translate
 
 PluginInfo = PluginInformation(
     name="GBPPlannerData",
@@ -20,6 +23,21 @@ PluginInfo = PluginInformation(
 # Constants
 name_window = "GBPPlanner Data"
 text_color = (255, 255, 255)
+
+# Global variables
+width_frame = 800
+height_frame = 400
+last_width_frame = width_frame
+last_height_frame = height_frame
+frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
+
+def LoadSettings():
+    global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
+    width_frame = settings.GetSettings("GBPPlannerData", "width_frame", 800)
+    height_frame = settings.GetSettings("GBPPlannerData", "height_frame", 400)
+    last_width_frame = width_frame
+    last_height_frame = height_frame
+    frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
 
 # Helper function to draw text on the frame
 def draw_text(frame, label, x_pos, y_pos, *values):
@@ -40,6 +58,8 @@ def handle_window_properties(window_name):
     windll.dwmapi.DwmSetWindowAttribute(hwnd, 35, byref(c_int(0x000000)), sizeof(c_int))
 
 def plugin(data):
+    global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
+
     # Check if external data is available
     if "externalapi" in data:
         received_json = data["externalapi"]["receivedJSON"]
@@ -53,10 +73,23 @@ def plugin(data):
         received_turn_angle = received_json.get('turn_angle', 0)
         received_next_speed = received_json.get('next_speed', 0)
 
-        # Create an empty frame to draw on
-        height_frame = 400
-        width_frame = 800
-        frame = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
+        try:
+            size_frame = cv2.getWindowImageRect(name_window)
+            width_frame, height_frame = size_frame[2], size_frame[3]
+            resize_frame = False
+        except:
+            width_frame, height_frame = last_width_frame, last_height_frame
+            resize_frame = True
+
+        if width_frame != last_width_frame or height_frame != last_height_frame:
+            if width_frame >= 50 and height_frame >= 50:
+                frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
+                settings.CreateSettings("GBPPlannerData", "width_frame", width_frame)
+                settings.CreateSettings("GBPPlannerData", "height_frame", height_frame)
+
+        last_width_frame, last_height_frame = width_frame, height_frame
+
+        frame = frame_original.copy()
 
         # Draw received data on the frame
         draw_text(frame, "Position:", 0.1, 0.2, received_position_x, received_position_y)
@@ -69,60 +102,44 @@ def plugin(data):
         cv2.imshow(name_window, frame)
 
         # Handle window properties and resizing
-        handle_window_properties(name_window)
+        if resize_frame:
+            handle_window_properties(name_window)
 
     return data
 
-# UI class to manage settings and display received data
+def onEnable():
+    LoadSettings()
+
+def onDisable():
+    cv2.destroyAllWindows()
+
 class UI():
-    def __init__(self, master) -> None:
-        self.master = master 
+    def __init__(self, master):
+        self.master = master
         self.init_ui()
-        self.master.after(1000, self.update_received_data)  # Update every second
 
     def init_ui(self):
         self.root = tk.Canvas(self.master, width=800, height=600, border=0, highlightthickness=0)
         self.root.pack_propagate(0)
         self.root.pack(anchor="center", expand=False)
         
-        self.received_data_frame = ttk.Frame(self.root)
-        self.received_data_frame.pack(fill="both", expand=True)
+        self.frame = ttk.Frame(self.root)
+        self.frame.pack(fill="both", expand=True)
 
-        self.position_label = ttk.Label(self.received_data_frame, text="Position: ")
-        self.position_label.pack(anchor="w")
-
-        self.velocity_label = ttk.Label(self.received_data_frame, text="Velocity: ")
-        self.velocity_label.pack(anchor="w")
-
-        self.acceleration_label = ttk.Label(self.received_data_frame, text="Acceleration: ")
-        self.acceleration_label.pack(anchor="w")
-
-        self.turn_angle_label = ttk.Label(self.received_data_frame, text="Turn Angle: ")
-        self.turn_angle_label.pack(anchor="w")
-
-        self.next_speed_label = ttk.Label(self.received_data_frame, text="Next Speed: ")
-        self.next_speed_label.pack(anchor="w")
+        helpers.MakeLabel(self.frame, "GBPPlanner Data Settings", 0, 0, font=("Robot", 12, "bold"), columnspan=3)
+        helpers.MakeEmptyLine(self.frame, 1, 0)
 
         ttk.Button(self.root, text="Save", command=self.save).pack(anchor="center", pady=6)
 
-    def update_received_data(self):
-        global data
+    def save(self):
+        LoadSettings()
 
-        if "externalapi" in data:
-            received_json = data["externalapi"]["receivedJSON"]
+    def tabFocused(self):
+        pass
 
-            # Update labels with the latest received data
-            position_text = f"Position: ({received_json.get('position', {}).get('x', 0):.2f}, {received_json.get('position', {}).get('y', 0):.2f})"
-            velocity_text = f"Velocity: ({received_json.get('velocity', {}).get('x', 0):.2f}, {received_json.get('velocity', {}).get('y', 0):.2f})"
-            acceleration_text = f"Acceleration: {received_json.get('acceleration', 0):.2f}"
-            turn_angle_text = f"Turn Angle: {received_json.get('turn_angle', 0):.2f}"
-            next_speed_text = f"Next Speed: {received_json.get('next_speed', 0):.2f}"
+    def update(self, data):
+        self.root.update()
 
-            self.position_label.config(text=position_text)
-            self.velocity_label.config(text=velocity_text)
-            self.acceleration_label.config(text=acceleration_text)
-            self.turn_angle_label.config(text=turn_angle_text)
-            self.next_speed_label.config(text=next_speed_text)
-
-        # Schedule the next update
-        self.master.after(1000, self.update_received_data)
+    def destroy(self):
+        self.root.destroy()
+        del self
