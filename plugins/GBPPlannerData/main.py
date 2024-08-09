@@ -92,6 +92,9 @@ def plugin(data):
 
     # Check if the required data is available
     if "externalapi" in data and "receivedJSON" in data["externalapi"]:
+        print(data["externalapi"]["receivedJSON"])
+        
+    if "externalapi" in data and "receivedJSON" in data["externalapi"]:
         received_json = data["externalapi"]["receivedJSON"]
         
         if received_json and isinstance(received_json, dict):
