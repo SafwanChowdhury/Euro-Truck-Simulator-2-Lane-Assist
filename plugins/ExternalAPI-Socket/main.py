@@ -80,7 +80,7 @@ async def receive_data(reader):
             message = data.decode().strip()
             try:
                 received_json = json.loads(message)
-                print("Received data:", received_json)
+                print("Data Recieved")
                 # print("\nReceived Truck Data:")
                 # print("-" * 30)
                 # print(f"Position: (x: {received_json['position']['x']:.2f}, y: {received_json['position']['y']:.2f})")
