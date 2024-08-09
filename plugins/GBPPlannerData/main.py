@@ -90,10 +90,15 @@ def plugin(data):
 
     frame = frame_original.copy()
 
-    # Check if the required data is available
-    if "externalapi" in data:
-        print(data["externalapi"])
+    print("-------------------------------------------------------------")
+    print("------------------------START--------------------------------")
+    print("-------------------------------------------------------------")
 
+    print(data)
+
+    print("-------------------------------------------------------------")
+    print("-------------------------END---------------------------------")
+    print("-------------------------------------------------------------")
     if "externalapi" in data and "receivedJSON" in data["externalapi"]:
         received_json = data["externalapi"]["receivedJSON"]
         
