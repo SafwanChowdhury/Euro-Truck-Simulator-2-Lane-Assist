@@ -401,18 +401,19 @@ def plugin(data):
         truck_cargo = ""
     
 
-    try:
-        if 'received_data' in data:
-            received_data = data['received_data']
-            received_position_x = received_data['position']['x']
-            received_position_y = received_data['position']['y']
-            received_velocity_x = received_data['velocity']['x']
-            received_velocity_y = received_data['velocity']['y']
-            received_acceleration = received_data['acceleration']
-            received_turn_angle = received_data['turn_angle']
-            received_next_speed = received_data['next_speed']
-    except:
-        pass
+    if 'received_data' in data:
+        received_data = data['received_data']
+        print(f"TruckStats received data: {received_data}")
+        received_position_x = received_data['position']['x']
+        received_position_y = received_data['position']['y']
+        received_velocity_x = received_data['velocity']['x']
+        received_velocity_y = received_data['velocity']['y']
+        received_acceleration = received_data['acceleration']
+        received_turn_angle = received_data['turn_angle']
+        received_next_speed = received_data['next_speed']
+    else:
+        print("No received_data in TruckStats plugin")
+
 
 
     time_route_left_hours = round(time_route_left // 3600)
@@ -1569,17 +1570,18 @@ class UI():
             self.closed_tab_hover_color_b.set(130)
             LoadSettings()
 
-        def update_received_data(self, data):
-            if 'received_data' in data:
-                received_data = data['received_data']
-                self.position_label.config(text=f"Position: ({received_data['position']['x']:.2f}, {received_data['position']['y']:.2f})")
-                self.velocity_label.config(text=f"Velocity: ({received_data['velocity']['x']:.2f}, {received_data['velocity']['y']:.2f})")
-                self.acceleration_label.config(text=f"Acceleration: {received_data['acceleration']:.2f}")
-                self.turn_angle_label.config(text=f"Turn Angle: {received_data['turn_angle']:.2f}")
-                self.next_speed_label.config(text=f"Next Speed: {received_data['next_speed']:.2f}")
+        def update_received_data(self):
+            global received_position_x, received_position_y, received_velocity_x, received_velocity_y
+            global received_acceleration, received_turn_angle, received_next_speed
 
-        def update(self, data): # When the panel is open this function is called each frame 
-            self.update_received_data(data)
+            self.position_label.config(text=f"Position: ({received_position_x:.2f}, {received_position_y:.2f})")
+            self.velocity_label.config(text=f"Velocity: ({received_velocity_x:.2f}, {received_velocity_y:.2f})")
+            self.acceleration_label.config(text=f"Acceleration: {received_acceleration:.2f}")
+            self.turn_angle_label.config(text=f"Turn Angle: {received_turn_angle:.2f}")
+            self.next_speed_label.config(text=f"Next Speed: {received_next_speed:.2f}")
+
+        def update(self, data): 
+            self.update_received_data()
             self.root.update()
     
     

@@ -178,6 +178,7 @@ def plugin(data):
 
     if 'received_data' in currentData:
         data['received_data'] = currentData['received_data']
+        print(f"Passing received data to other plugins: {data['received_data']}")
 
     return data
 
