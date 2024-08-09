@@ -90,28 +90,6 @@ def plugin(data):
 
     frame = frame_original.copy()
 
-    def plugin(data):
-    global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
-
-    try:
-        size_frame = cv2.getWindowImageRect(name_window)
-        width_frame, height_frame = size_frame[2], size_frame[3]
-        resize_frame = False
-    except:
-        width_frame, height_frame = last_width_frame, last_height_frame
-        resize_frame = True
-
-    if width_frame != last_width_frame or height_frame != last_height_frame:
-        if width_frame >= 50 and height_frame >= 50:
-            frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
-            settings.CreateSettings("GBPPlannerData", "width_frame", width_frame)
-            settings.CreateSettings("GBPPlannerData", "height_frame", height_frame)
-
-    last_width_frame, last_height_frame = width_frame, height_frame
-
-    frame = frame_original.copy()
-
-    # Check if the required data is available
     if "last" in data and "externalapi" in data["last"] and "receivedJSON" in data["last"]["externalapi"]:
         received_json = data["last"]["externalapi"]["receivedJSON"]
         
