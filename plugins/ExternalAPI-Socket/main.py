@@ -12,7 +12,7 @@ PluginInfo = PluginInformation(
     description="Will send application data to connected client over websockets. Used for external applications.",
     version="0.1",
     author="Tumppi066 & SafwanChowdhury",
-    url="https://github.com/Tumppi066/Euro-Truck-Simulator-2-Lane-Assist",
+    url="https://github.com/SafwanChowdhury/Euro-Truck-Simulator-2-Lane-Assist",
     type="dynamic", # = Panel
     dynamicOrder="last" # Will run the plugin before anything else in the mainloop (data will be empty)
 )
@@ -167,8 +167,8 @@ def plugin(data):
         tempData[key] = convert_ndarrays(data[key])
     
     currentData = tempData
-    data["gbpData"] = {}
-    data["gbpData"]["receivedJSON"] = received_json
+    data["externalapi"] = {}
+    data["externalapi"]["receivedJSON"] = received_json
     return data
 
 class UI():
