@@ -7,7 +7,10 @@ import tkinter as tk
 from tkinter import ttk
 import src.helpers as helpers
 import src.settings as settings
+import src.variables as variables
 from src.translator import Translate
+import time
+import pyautogui
 
 PluginInfo = PluginInformation(
     name="GBPPlannerData",
@@ -25,23 +28,23 @@ name_window = "GBPPlanner Data"
 text_color = (255, 255, 255)
 
 # Global variables
-width_frame = 800
-height_frame = 400
+width_screen, height_screen = pyautogui.size()
+width_frame = settings.GetSettings("GBPPlannerData", "width_frame", round(height_screen/2.5))
+height_frame = settings.GetSettings("GBPPlannerData", "height_frame", round(height_screen/4))
 last_width_frame = width_frame
 last_height_frame = height_frame
 frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
 
 def LoadSettings():
     global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
-    width_frame = settings.GetSettings("GBPPlannerData", "width_frame", 800)
-    height_frame = settings.GetSettings("GBPPlannerData", "height_frame", 400)
+    width_frame = settings.GetSettings("GBPPlannerData", "width_frame", round(height_screen/2.5))
+    height_frame = settings.GetSettings("GBPPlannerData", "height_frame", round(height_screen/4))
     last_width_frame = width_frame
     last_height_frame = height_frame
     frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
 
-# Helper function to draw text on the frame
-def draw_text(frame, label, x_pos, y_pos, *values):
-    current_text = f"{label} {', '.join(f'{value:.2f}' for value in values)}"
+def draw_text(frame, label, x_pos, y_pos, value):
+    current_text = f"{label} {value:.2f}"
     fontscale = 1
     thickness = 2
 
@@ -51,59 +54,66 @@ def draw_text(frame, label, x_pos, y_pos, *values):
     cv2.putText(frame, current_text, (round(x_pos * frame.shape[1]), round(y_pos * frame.shape[0] + height / 2)),
                 cv2.FONT_HERSHEY_SIMPLEX, fontscale, text_color, thickness)
 
-# Helper function to handle window properties and resizing
 def handle_window_properties(window_name):
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     hwnd = win32gui.FindWindow(None, window_name)
     windll.dwmapi.DwmSetWindowAttribute(hwnd, 35, byref(c_int(0x000000)), sizeof(c_int))
 
+    icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
+    hicon = win32gui.LoadImage(None, f"{variables.PATH}assets/favicon.ico", win32con.IMAGE_ICON, 0, 0, icon_flags)
+
+    win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_SMALL, hicon)
+    win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_BIG, hicon)
+
 def plugin(data):
     global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
 
-    # Check if external data is available
+    try:
+        size_frame = cv2.getWindowImageRect(name_window)
+        width_frame, height_frame = size_frame[2], size_frame[3]
+        resize_frame = False
+    except:
+        width_frame, height_frame = last_width_frame, last_height_frame
+        resize_frame = True
+
+    if width_frame != last_width_frame or height_frame != last_height_frame:
+        if width_frame >= 50 and height_frame >= 50:
+            frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
+            settings.CreateSettings("GBPPlannerData", "width_frame", width_frame)
+            settings.CreateSettings("GBPPlannerData", "height_frame", height_frame)
+
+    last_width_frame, last_height_frame = width_frame, height_frame
+
+    frame = frame_original.copy()
+
     if "externalapi" in data:
         received_json = data["externalapi"]["receivedJSON"]
 
-        # Extract relevant data from received_json
-        received_position_x = received_json.get('position', {}).get('x', 0)
-        received_position_y = received_json.get('position', {}).get('y', 0)
-        received_velocity_x = received_json.get('velocity', {}).get('x', 0)
-        received_velocity_y = received_json.get('velocity', {}).get('y', 0)
-        received_acceleration = received_json.get('acceleration', 0)
-        received_turn_angle = received_json.get('turn_angle', 0)
-        received_next_speed = received_json.get('next_speed', 0)
+        position_x = received_json.get('position', {}).get('x', 0)
+        position_y = received_json.get('position', {}).get('y', 0)
+        velocity_x = received_json.get('velocity', {}).get('x', 0)
+        velocity_y = received_json.get('velocity', {}).get('y', 0)
+        acceleration = received_json.get('acceleration', 0)
+        turn_angle = received_json.get('turn_angle', 0)
+        next_speed = received_json.get('next_speed', 0)
 
-        try:
-            size_frame = cv2.getWindowImageRect(name_window)
-            width_frame, height_frame = size_frame[2], size_frame[3]
-            resize_frame = False
-        except:
-            width_frame, height_frame = last_width_frame, last_height_frame
-            resize_frame = True
+        draw_text(frame, "Position X:", 0.1, 0.2, position_x)
+        draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
+        draw_text(frame, "Velocity X:", 0.1, 0.4, velocity_x)
+        draw_text(frame, "Velocity Y:", 0.1, 0.5, velocity_y)
+        draw_text(frame, "Acceleration:", 0.1, 0.6, acceleration)
+        draw_text(frame, "Turn Angle:", 0.1, 0.7, turn_angle)
+        draw_text(frame, "Next Speed:", 0.1, 0.8, next_speed)
 
-        if width_frame != last_width_frame or height_frame != last_height_frame:
-            if width_frame >= 50 and height_frame >= 50:
-                frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
-                settings.CreateSettings("GBPPlannerData", "width_frame", width_frame)
-                settings.CreateSettings("GBPPlannerData", "height_frame", height_frame)
+    else:
+        cv2.putText(frame, "Waiting for GBPPlanner data...", (int(0.1*width_frame), int(0.5*height_frame)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, text_color, 2)
 
-        last_width_frame, last_height_frame = width_frame, height_frame
+    cv2.imshow(name_window, frame)
 
-        frame = frame_original.copy()
-
-        # Draw received data on the frame
-        draw_text(frame, "Position:", 0.1, 0.2, received_position_x, received_position_y)
-        draw_text(frame, "Velocity:", 0.1, 0.3, received_velocity_x, received_velocity_y)
-        draw_text(frame, "Acceleration:", 0.1, 0.4, received_acceleration)
-        draw_text(frame, "Turn Angle:", 0.1, 0.5, received_turn_angle)
-        draw_text(frame, "Next Speed:", 0.1, 0.6, received_next_speed)
-
-        # Show the frame in a window
-        cv2.imshow(name_window, frame)
-
-        # Handle window properties and resizing
-        if resize_frame:
-            handle_window_properties(name_window)
+    if resize_frame:
+        cv2.resizeWindow(name_window, width_frame, height_frame)
+        handle_window_properties(name_window)
 
     return data
 
