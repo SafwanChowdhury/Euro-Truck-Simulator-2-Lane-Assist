@@ -310,7 +310,7 @@ def plugin(data):
     switch_next_tab_pressed = controls.GetKeybindValue("Switch to next TruckStats tab")
     if switch_next_tab_pressed == False and last_switch_next_tab_pressed == True:
         current_tab += 1
-        if current_tab > 5:
+        if current_tab > 6:
             current_tab = 1
         settings.CreateSettings("TruckStats", "current_tab", current_tab)
     last_switch_next_tab_pressed = switch_next_tab_pressed
@@ -682,6 +682,41 @@ def plugin(data):
     if thickness_current_text <= 0:
         thickness_current_text = 1
     cv2.putText(frame, current_text, (round(0.80*width_frame-width_current_text/2), round(0.04*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
+
+    if current_tab != 6:
+        if mouseposx >= 0.89 and mouseposy >= 0.02 and mouseposx <= 1.01 and mouseposy <= 0.06:
+            cv2.rectangle(frame, (round(0.90*width_frame), round(0.03*height_frame)), (round(1.00*width_frame), round(0.05*height_frame)), closed_tab_hover_color, round(0.02*width_frame))
+            cv2.rectangle(frame, (round(0.90*width_frame), round(0.03*height_frame)), (round(1.00*width_frame), round(0.05*height_frame)), closed_tab_hover_color, -1)
+            if mouse_left_clicked == True:
+                current_tab = 6
+                settings.CreateSettings("TruckStats", "current_tab", 6)
+        else:
+            cv2.rectangle(frame, (round(0.90*width_frame), round(0.03*height_frame)), (round(1.00*width_frame), round(0.05*height_frame)), closed_tab_color, round(0.02*width_frame))
+            cv2.rectangle(frame, (round(0.90*width_frame), round(0.03*height_frame)), (round(1.00*width_frame), round(0.05*height_frame)), closed_tab_color, -1)
+    else:
+        if mouseposx >= 0.89 and mouseposy >= 0.02 and mouseposx <= 1.01 and mouseposy <= 0.06:
+            cv2.rectangle(frame, (round(0.90*width_frame), round(0.03*height_frame)), (round(1.00*width_frame), round(0.05*height_frame)), open_tab_hover_color, round(0.02*width_frame))
+            cv2.rectangle(frame, (round(0.90*width_frame), round(0.03*height_frame)), (round(1.00*width_frame), round(0.05*height_frame)), open_tab_hover_color, -1)
+        else:
+            cv2.rectangle(frame, (round(0.90*width_frame), round(0.03*height_frame)), (round(1.00*width_frame), round(0.05*height_frame)), open_tab_color, round(0.02*width_frame))
+            cv2.rectangle(frame, (round(0.90*width_frame), round(0.03*height_frame)), (round(1.00*width_frame), round(0.05*height_frame)), open_tab_color, -1)
+    current_text = "Received"
+    width_target_current_text = 0.1*width_frame
+    fontscale_current_text = 1
+    textsize_current_text, _ = cv2.getTextSize(current_text, cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, 1)
+    width_current_text, height_current_text = textsize_current_text
+    max_count_current_text = 3
+    while width_current_text != width_target_current_text:
+        fontscale_current_text *= width_target_current_text / width_current_text if width_current_text != 0 else 1
+        textsize_current_text, _ = cv2.getTextSize(current_text, cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, 1)
+        width_current_text, height_current_text = textsize_current_text
+        max_count_current_text -= 1
+        if max_count_current_text <= 0:
+            break
+    thickness_current_text = round(fontscale_current_text*2)
+    if thickness_current_text <= 0:
+        thickness_current_text = 1
+    cv2.putText(frame, current_text, (round(0.95*width_frame-width_current_text/2), round(0.04*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
 
     
     if current_tab == 1:
@@ -1527,7 +1562,17 @@ class UI():
             self.closed_tab_hover_color_b.set(130)
             LoadSettings()
 
+        def update_received_data(self, data):
+            if 'received_data' in data:
+                received_data = data['received_data']
+                self.position_label.config(text=f"Position: ({received_data['position']['x']:.2f}, {received_data['position']['y']:.2f})")
+                self.velocity_label.config(text=f"Velocity: ({received_data['velocity']['x']:.2f}, {received_data['velocity']['y']:.2f})")
+                self.acceleration_label.config(text=f"Acceleration: {received_data['acceleration']:.2f}")
+                self.turn_angle_label.config(text=f"Turn Angle: {received_data['turn_angle']:.2f}")
+                self.next_speed_label.config(text=f"Next Speed: {received_data['next_speed']:.2f}")
+
         def update(self, data): # When the panel is open this function is called each frame 
+            self.update_received_data(data)
             self.root.update()
     
     
