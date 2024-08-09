@@ -51,12 +51,35 @@ async def handle_client(reader, writer):
     try:
         while not stop_event.is_set():
             try:
+                # Receive data from the client
+                data = await reader.readline()
+                if not data:
+                    break
+                
+                # Decode and parse the received data
+                received_data = json.loads(data.decode())
+                
+                # Print the received truck data
+                print("Received truck data:")
+                for truck_id, truck_data in received_data.get('trucks', {}).items():
+                    print(f"Truck {truck_id}:")
+                    print(f"  Position: ({truck_data['position']['x']}, {truck_data['position']['y']})")
+                    print(f"  Velocity: ({truck_data['velocity']['x']}, {truck_data['velocity']['y']})")
+                    print(f"  Acceleration: {truck_data['acceleration']}")
+                    print(f"  Turn Angle: {truck_data['turn_angle']}")
+                    print(f"  Next Speed: {truck_data['next_speed']}")
+                    print()
+                
+                # Send the currentData back to the client
                 message = json.dumps(currentData)
                 writer.write(message.encode() + b'\n')
                 await writer.drain()
-                await asyncio.sleep(0.033) # 30 FPS
+                
+                await asyncio.sleep(0.033)  # 30 FPS
+            except json.JSONDecodeError:
+                print(f"Error decoding JSON from {addr}")
             except Exception as e:
-                print(f"Error sending data to {addr}: {e}")
+                print(f"Error handling client {addr}: {e}")
                 break
     finally:
         print(f"Connection closed for {addr}")
