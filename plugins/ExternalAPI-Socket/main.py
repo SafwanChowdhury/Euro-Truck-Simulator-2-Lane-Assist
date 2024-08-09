@@ -80,6 +80,14 @@ async def receive_data(reader):
             try:
                 received_json = json.loads(message)
                 currentData['received_data'] = received_json
+                print("\nReceived Truck Data:")
+                print("-" * 30)
+                print(f"Position: (x: {received_json['position']['x']:.2f}, y: {received_json['position']['y']:.2f})")
+                print(f"Velocity: (x: {received_json['velocity']['x']:.2f}, y: {received_json['velocity']['y']:.2f})")
+                print(f"Acceleration: {received_json['acceleration']:.2f}")
+                print(f"Turn Angle: {received_json['turn_angle']:.2f}")
+                print(f"Next Speed: {received_json['next_speed']:.2f}")
+                print("-" * 30)
             except json.JSONDecodeError:
                 print(f"Error decoding JSON: {message}")
             except KeyError as e:
@@ -167,6 +175,10 @@ def plugin(data):
         tempData[key] = convert_ndarrays(data[key])
     
     currentData = tempData
+
+    if 'received_data' in currentData:
+        data['received_data'] = currentData['received_data']
+
     return data
 
 class UI():
