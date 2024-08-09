@@ -117,7 +117,7 @@ def plugin(data):
             draw_text(frame, "Velocity Y:", 0.1, 0.5, velocity_y)
             draw_text(frame, "Acceleration:", 0.1, 0.6, acceleration)
             draw_text(frame, "Turn Angle:", 0.1, 0.7, turn_angle)
-            draw_text(frame, "Next Speed:", 0.1, 0.8, next_speed)
+            draw_text(frame, "Next Speed:", 0.1, 0.8, speedCalc(next_speed))
         else:
             cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
