@@ -1184,6 +1184,13 @@ class UI():
             self.root = tk.Canvas(self.master, width=800, height=600, border=0, highlightthickness=0)
             self.root.grid_propagate(0) 
             self.root.pack_propagate(0)
+
+            self.position_label = helpers.MakeLabel(ReceivedDataFrame, "Position: ", 1, 0, sticky="w")
+            self.velocity_label = helpers.MakeLabel(ReceivedDataFrame, "Velocity: ", 2, 0, sticky="w")
+            self.acceleration_label = helpers.MakeLabel(ReceivedDataFrame, "Acceleration: ", 3, 0, sticky="w")
+            self.turn_angle_label = helpers.MakeLabel(ReceivedDataFrame, "Turn Angle: ", 4, 0, sticky="w")
+            self.next_speed_label = helpers.MakeLabel(ReceivedDataFrame, "Next Speed: ", 5, 0, sticky="w")
+
             
             notebook = ttk.Notebook(self.root)
             notebook.pack(anchor="center", fill="both", expand=True)
