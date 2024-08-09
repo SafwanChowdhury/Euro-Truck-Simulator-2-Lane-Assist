@@ -89,7 +89,7 @@ def plugin(data):
     last_width_frame, last_height_frame = width_frame, height_frame
 
     frame = frame_original.copy()
-
+    print(data)
     if "externalapi" in data:
         received_json = data["externalapi"]["receivedJSON"]
 
