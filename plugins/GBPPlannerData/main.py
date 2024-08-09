@@ -57,6 +57,10 @@ def draw_text(frame, label, x_pos, y_pos, value):
 def handle_window_properties(window_name):
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     hwnd = win32gui.FindWindow(None, window_name)
+
+    win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, 
+                          win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+    
     windll.dwmapi.DwmSetWindowAttribute(hwnd, 35, byref(c_int(0x000000)), sizeof(c_int))
 
     icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
@@ -114,6 +118,12 @@ def plugin(data):
     if resize_frame:
         cv2.resizeWindow(name_window, width_frame, height_frame)
         handle_window_properties(name_window)
+    else:
+        hwnd = win32gui.FindWindow(None, name_window)
+        win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, 
+                              win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+
+    cv2.setWindowProperty(name_window, cv2.WND_PROP_TOPMOST, 1)
 
     return data
 
