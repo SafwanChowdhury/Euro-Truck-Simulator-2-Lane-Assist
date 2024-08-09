@@ -43,6 +43,17 @@ controls.RegisterKeybind("Switch to next TruckStats tab",
                          notBoundInfo="You can switch to the next tab with this keybind.",
                          description="You can switch to the next tab with this keybind.",)
 
+global received_position_x, received_position_y, received_velocity_x, received_velocity_y
+global received_acceleration, received_turn_angle, received_next_speed
+
+received_position_x = 0
+received_position_y = 0
+received_velocity_x = 0
+received_velocity_y = 0
+received_acceleration = 0
+received_turn_angle = 0
+received_next_speed = 0
+
 def LoadSettings():
     global name_window
     global current_tab
@@ -86,6 +97,9 @@ def LoadSettings():
     global reset_fuelgraph
     global reset_enginegraph
     global last_route_distance_left
+
+    global received_position_x, received_position_y, received_velocity_x, received_velocity_y
+    global received_acceleration, received_turn_angle, received_next_speed
 
     name_window = "TruckStats"
     current_tab = settings.GetSettings("TruckStats", "current_tab", 1)
@@ -179,6 +193,14 @@ def LoadSettings():
         settings.CreateSettings("TruckStats", "closed_tab_hover_color_b", 130)
         closed_tab_hover_color_b = 130
     closed_tab_hover_color = (closed_tab_hover_color_b, closed_tab_hover_color_g, closed_tab_hover_color_r)
+
+    received_position_x = 0
+    received_position_y = 0
+    received_velocity_x = 0
+    received_velocity_y = 0
+    received_acceleration = 0
+    received_turn_angle = 0
+    received_next_speed = 0
     
 LoadSettings()
 
@@ -226,6 +248,9 @@ def plugin(data):
     global reset_fuelgraph
     global reset_enginegraph
     global last_route_distance_left
+
+    global received_position_x, received_position_y, received_velocity_x, received_velocity_y
+    global received_acceleration, received_turn_angle, received_next_speed
 
     try:
         size_frame = cv2.getWindowImageRect(name_window)
@@ -375,6 +400,21 @@ def plugin(data):
         truck_name = ""
         truck_cargo = ""
     
+
+    try:
+        if 'received_data' in data:
+            received_data = data['received_data']
+            received_position_x = received_data['position']['x']
+            received_position_y = received_data['position']['y']
+            received_velocity_x = received_data['velocity']['x']
+            received_velocity_y = received_data['velocity']['y']
+            received_acceleration = received_data['acceleration']
+            received_turn_angle = received_data['turn_angle']
+            received_next_speed = received_data['next_speed']
+    except:
+        pass
+
+
     time_route_left_hours = round(time_route_left // 3600)
     time_route_left_minutes = round((time_route_left % 3600) // 60)
     time_route_left_seconds = round(time_route_left % 60)
@@ -997,6 +1037,37 @@ def plugin(data):
                 current_text_color = (0, 0, 255)
         cv2.putText(frame, f"{truck_cargo}", (round(0.9*width_frame-width_current_text), round(0.2*height_frame+height_original_text/2+height_original_text*1.5)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
 
+    if current_tab == 6:
+        current_text = f"Position: "
+        width_target_current_text = 0.3*width_frame
+        fontscale_current_text = 1
+        textsize_current_text, _ = cv2.getTextSize(current_text, cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, 1)
+        width_current_text, height_current_text = textsize_current_text
+        max_count_current_text = 3
+        while width_current_text != width_target_current_text:
+            fontscale_current_text *= width_target_current_text / width_current_text if width_current_text != 0 else 1
+            textsize_current_text, _ = cv2.getTextSize(current_text, cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, 1)
+            width_current_text, height_current_text = textsize_current_text
+            max_count_current_text -= 1
+            if max_count_current_text <= 0:
+                break
+        thickness_current_text = round(fontscale_current_text*2)
+        if thickness_current_text <= 0:
+            thickness_current_text = 1
+        cv2.putText(frame, current_text, (round(0.1*width_frame), round(0.2*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
+        cv2.putText(frame, f"({received_position_x:.2f}, {received_position_y:.2f})", (round(0.4*width_frame), round(0.2*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
+
+        cv2.putText(frame, f"Velocity: ", (round(0.1*width_frame), round(0.3*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
+        cv2.putText(frame, f"({received_velocity_x:.2f}, {received_velocity_y:.2f})", (round(0.4*width_frame), round(0.3*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
+
+        cv2.putText(frame, f"Acceleration: ", (round(0.1*width_frame), round(0.4*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
+        cv2.putText(frame, f"{received_acceleration:.2f}", (round(0.4*width_frame), round(0.4*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
+
+        cv2.putText(frame, f"Turn Angle: ", (round(0.1*width_frame), round(0.5*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
+        cv2.putText(frame, f"{received_turn_angle:.2f}", (round(0.4*width_frame), round(0.5*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
+
+        cv2.putText(frame, f"Next Speed: ", (round(0.1*width_frame), round(0.6*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
+        cv2.putText(frame, f"{received_next_speed:.2f}", (round(0.4*width_frame), round(0.6*height_frame+height_current_text/2)), cv2.FONT_HERSHEY_SIMPLEX, fontscale_current_text, text_color, thickness_current_text)
 
     if look_for_trucksimapi == True:
         if "TruckSimAPI" not in settings.GetSettings("Plugins", "Enabled", []):
@@ -1090,6 +1161,8 @@ class UI():
             FuelTabFrame.pack()
             EngineTabFrame = ttk.Frame(notebook)
             EngineTabFrame.pack()
+            ReceivedDataFrame = ttk.Frame(notebook)
+            ReceivedDataFrame.pack()
             
             generalFrame.columnconfigure(0, weight=1)
             generalFrame.columnconfigure(1, weight=1)
@@ -1112,11 +1185,18 @@ class UI():
             EngineTabFrame.columnconfigure(1, weight=1)
             EngineTabFrame.columnconfigure(2, weight=1)
             helpers.MakeLabel(EngineTabFrame, "Engine Tab", 0, 0, font=("Robot", 12, "bold"), columnspan=3)
-            
+
+            ReceivedDataFrame.columnconfigure(0, weight=1)
+            ReceivedDataFrame.columnconfigure(1, weight=1)
+            ReceivedDataFrame.columnconfigure(2, weight=1)
+            helpers.MakeLabel(ReceivedDataFrame, "Received Data", 0, 0, font=("Robot", 12, "bold"), columnspan=3)
+
             notebook.add(generalFrame, text=Translate("General"))
             notebook.add(colorsFrame, text=Translate("Color Settings"))
             notebook.add(FuelTabFrame, text=Translate("Fuel Tab"))
             notebook.add(EngineTabFrame, text=Translate("Engine Tab"))
+            notebook.add(ReceivedDataFrame, text=Translate("Received Data"))
+
             
             ttk.Button(self.root, text="Save", command=self.save, width=15).pack(anchor="center", pady=6)
             
