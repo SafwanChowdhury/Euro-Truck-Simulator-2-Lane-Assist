@@ -27,7 +27,9 @@ import json
 import asyncio
 import websockets
 
-port = 39846
+SEND_PORT = 39846
+RECEIVE_PORT = 39847
+
 
 currentData = {}
 server = None
@@ -44,21 +46,10 @@ def convert_ndarrays(obj):
     else:
         return obj
 
-async def handle_client(reader, writer):
+async def handle_send(reader, writer):
     global currentData, stop_event
     addr = writer.get_extra_info('peername')
-    print(f"New connection from {addr}")
-    try:
-        send_task = asyncio.create_task(send_data(writer))
-        receive_task = asyncio.create_task(receive_data(reader))
-        await asyncio.gather(send_task, receive_task)
-    finally:
-        print(f"Connection closed for {addr}")
-        writer.close()
-        await writer.wait_closed()
-
-async def send_data(writer):
-    global currentData, stop_event
+    print(f"New send connection from {addr}")
     try:
         while not stop_event.is_set():
             message = json.dumps(currentData)
@@ -67,9 +58,15 @@ async def send_data(writer):
             await asyncio.sleep(0.033)  # 30 FPS
     except Exception as e:
         print(f"Error sending data: {e}")
+    finally:
+        print(f"Send connection closed for {addr}")
+        writer.close()
+        await writer.wait_closed()
 
-async def receive_data(reader):
+async def handle_receive(reader, writer):
     global stop_event
+    addr = writer.get_extra_info('peername')
+    print(f"New receive connection from {addr}")
     try:
         while not stop_event.is_set():
             data = await reader.readline()
@@ -84,26 +81,30 @@ async def receive_data(reader):
                 print(f"Error decoding JSON: {message}")
     except Exception as e:
         print(f"Error receiving data: {e}")
+    finally:
+        print(f"Receive connection closed for {addr}")
+        writer.close()
+        await writer.wait_closed()
 
-
-async def start_server():
+async def start_servers():
     global server, stop_event
     stop_event = asyncio.Event()
     try:
-        server = await asyncio.start_server(handle_client, '0.0.0.0', port, reuse_address=True)
-        print(f"Server started on 0.0.0.0:{port}")
-        async with server:
+        send_server = await asyncio.start_server(handle_send, '0.0.0.0', SEND_PORT, reuse_address=True)
+        receive_server = await asyncio.start_server(handle_receive, '0.0.0.0', RECEIVE_PORT, reuse_address=True)
+        print(f"Send server started on 0.0.0.0:{SEND_PORT}")
+        print(f"Receive server started on 0.0.0.0:{RECEIVE_PORT}")
+        async with send_server, receive_server:
             await stop_event.wait()
     except OSError as e:
-        print(f"Error starting server: {e}")
-        print("Try changing the port in the settings if this persists.")
-
+        print(f"Error starting servers: {e}")
+        print("Try changing the ports in the settings if this persists.")
 
 def run_server():
     asyncio.set_event_loop(asyncio.new_event_loop())
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(start_server())
+        loop.run_until_complete(start_servers())
     except Exception as e:
         print(f"Error in run_server: {e}")
     finally:
@@ -170,49 +171,51 @@ def plugin(data):
     return data
 
 class UI():
-    try: # The panel is in a try loop so that the logger can log errors if they occur
-        
+    try:
         def __init__(self, master) -> None:
-            self.master = master # "master" is the mainUI window
+            self.master = master
             self.exampleFunction()
         
         def destroy(self):
             self.done = True
             self.root.destroy()
             del self
-
         
         def exampleFunction(self):
-            
             try:
-                self.root.destroy() # Load the UI each time this plugin is called
-            except: pass
+                self.root.destroy()
+            except:
+                pass
             
             self.root = tk.Canvas(self.master, width=600, height=520, border=0, highlightthickness=0)
-            self.root.grid_propagate(0) # Don't fit the canvast to the widgets
+            self.root.grid_propagate(0)
             self.root.pack_propagate(0)
 
-            def savenewport():
-                print(self.newport.get())
-                settings.CreateSettings("ExternalAPI", "port", self.newport.get())
+            def save_ports():
+                settings.CreateSettings("ExternalAPI-Socket", "send_port", self.send_port.get())
+                settings.CreateSettings("ExternalAPI-Socket", "receive_port", self.receive_port.get())
+                print(f"Send Port: {self.send_port.get()}, Receive Port: {self.receive_port.get()}")
+
             def validate_entry(text):
-                # Make sure that only integers can be typed
                 return text.isdecimal()
 
-            ttk.Label(self.root, text="Port").grid(row=1, padx=5, pady=5)
-            self.newport = tk.IntVar()
-            ttk.Entry(self.root, validate="key", textvariable=self.newport,
-    validatecommand=(self.root.register(validate_entry), "%S")).grid(row=2, padx=5, pady=5)
-            ttk.Button(self.root, text="Save", command=savenewport).grid(row=3, padx=5, pady=5)
+            ttk.Label(self.root, text="Send Port").grid(row=1, padx=5, pady=5)
+            self.send_port = tk.IntVar(value=SEND_PORT)
+            ttk.Entry(self.root, validate="key", textvariable=self.send_port,
+                validatecommand=(self.root.register(validate_entry), "%S")).grid(row=2, padx=5, pady=5)
 
-            ttk.button(self.root, text="button").grid()
+            ttk.Label(self.root, text="Receive Port").grid(row=3, padx=5, pady=5)
+            self.receive_port = tk.IntVar(value=RECEIVE_PORT)
+            ttk.Entry(self.root, validate="key", textvariable=self.receive_port,
+                validatecommand=(self.root.register(validate_entry), "%S")).grid(row=4, padx=5, pady=5)
+
+            ttk.Button(self.root, text="Save", command=save_ports).grid(row=5, padx=5, pady=5)
+
             self.root.pack(anchor="center", expand=False)
             self.root.update()
         
-        
-        def update(self, data): # When the panel is open this function is called each frame 
+        def update(self, data):
             self.root.update()
-    
     
     except Exception as ex:
         print(ex.args)
