@@ -51,35 +51,24 @@ async def handle_client(reader, writer):
     try:
         while not stop_event.is_set():
             try:
-                # Receive data from the client
                 data = await reader.readline()
                 if not data:
                     break
+                message = data.decode().strip()
                 
-                # Decode and parse the received data
-                received_data = json.loads(data.decode())
+                # Parse the received JSON data
+                try:
+                    received_json = json.loads(message)
+                    currentData['received_json'] = json.dumps(received_json)
+                except json.JSONDecodeError:
+                    print(f"Error decoding JSON from {addr}: {message}")
                 
-                # Print the received truck data
-                print("Received truck data:")
-                for truck_id, truck_data in received_data.get('trucks', {}).items():
-                    print(f"Truck {truck_id}:")
-                    print(f"  Position: ({truck_data['position']['x']}, {truck_data['position']['y']})")
-                    print(f"  Velocity: ({truck_data['velocity']['x']}, {truck_data['velocity']['y']})")
-                    print(f"  Acceleration: {truck_data['acceleration']}")
-                    print(f"  Turn Angle: {truck_data['turn_angle']}")
-                    print(f"  Next Speed: {truck_data['next_speed']}")
-                    print()
-                
-                # Send the currentData back to the client
-                message = json.dumps(currentData)
-                writer.write(message.encode() + b'\n')
+                response = json.dumps(currentData)
+                writer.write(response.encode() + b'\n')
                 await writer.drain()
-                
-                await asyncio.sleep(0.033)  # 30 FPS
-            except json.JSONDecodeError:
-                print(f"Error decoding JSON from {addr}")
+                await asyncio.sleep(0.033) # 30 FPS
             except Exception as e:
-                print(f"Error handling client {addr}: {e}")
+                print(f"Error handling data from {addr}: {e}")
                 break
     finally:
         print(f"Connection closed for {addr}")
@@ -97,6 +86,7 @@ async def start_server():
     except OSError as e:
         print(f"Error starting server: {e}")
         print("Try changing the port in the settings if this persists.")
+
 
 def run_server():
     asyncio.set_event_loop(asyncio.new_event_loop())
@@ -166,6 +156,14 @@ def plugin(data):
         tempData[key] = convert_ndarrays(data[key])
     
     currentData = tempData
+    
+    try:
+        received_json = json.loads(data.get('received_json', '{}'))
+        print("Received JSON data:")
+        print(json.dumps(received_json, indent=2))
+    except json.JSONDecodeError:
+        print("Error decoding JSON data")
+    
     return data
 
 class UI():
