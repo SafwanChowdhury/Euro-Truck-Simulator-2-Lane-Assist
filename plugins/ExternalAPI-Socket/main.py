@@ -65,8 +65,8 @@ async def send_data(writer):
             message = json.dumps(currentData)
             writer.write(message.encode() + b'\n')
             await writer.drain()
+            print("Data Sent")
             await asyncio.sleep(0.033)  # 30 FPS
-            print("Sent data:", currentData)
     except Exception as e:
         print(f"Error sending data: {e}")
 
