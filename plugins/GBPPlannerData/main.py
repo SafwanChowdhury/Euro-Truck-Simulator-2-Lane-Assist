@@ -90,18 +90,32 @@ def plugin(data):
 
     frame = frame_original.copy()
 
-    print("-------------------------------------------------------------")
-    print("------------------------START--------------------------------")
-    print("-------------------------------------------------------------")
+    def plugin(data):
+    global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
 
-    print(data)
+    try:
+        size_frame = cv2.getWindowImageRect(name_window)
+        width_frame, height_frame = size_frame[2], size_frame[3]
+        resize_frame = False
+    except:
+        width_frame, height_frame = last_width_frame, last_height_frame
+        resize_frame = True
 
-    print("-------------------------------------------------------------")
-    print("-------------------------END---------------------------------")
-    print("-------------------------------------------------------------")
-    if "externalapi" in data and "receivedJSON" in data["externalapi"]:
-        received_json = data["externalapi"]["receivedJSON"]
+    if width_frame != last_width_frame or height_frame != last_height_frame:
+        if width_frame >= 50 and height_frame >= 50:
+            frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
+            settings.CreateSettings("GBPPlannerData", "width_frame", width_frame)
+            settings.CreateSettings("GBPPlannerData", "height_frame", height_frame)
+
+    last_width_frame, last_height_frame = width_frame, height_frame
+
+    frame = frame_original.copy()
+
+    # Check if the required data is available
+    if "last" in data and "externalapi" in data["last"] and "receivedJSON" in data["last"]["externalapi"]:
+        received_json = data["last"]["externalapi"]["receivedJSON"]
         
+        # Ensure received_json is not None and is a dictionary
         if received_json and isinstance(received_json, dict):
             position = received_json.get('position', {})
             velocity = received_json.get('velocity', {})
@@ -134,6 +148,7 @@ def plugin(data):
         cv2.resizeWindow(name_window, width_frame, height_frame)
         handle_window_properties(name_window)
     else:
+        # Ensure the window stays on top even when not resizing
         hwnd = win32gui.FindWindow(None, name_window)
         win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, 
                               win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
