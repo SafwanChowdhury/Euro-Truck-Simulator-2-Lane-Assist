@@ -29,6 +29,7 @@ import websockets
 
 port = 39846
 
+
 currentData = {}
 server = None
 server_task = None
@@ -49,19 +50,50 @@ async def handle_client(reader, writer):
     addr = writer.get_extra_info('peername')
     print(f"New connection from {addr}")
     try:
-        while not stop_event.is_set():
-            try:
-                message = json.dumps(currentData)
-                writer.write(message.encode() + b'\n')
-                await writer.drain()
-                await asyncio.sleep(0.033) # 30 FPS
-            except Exception as e:
-                print(f"Error sending data to {addr}: {e}")
-                break
+        send_task = asyncio.create_task(send_data(writer))
+        receive_task = asyncio.create_task(receive_data(reader))
+        await asyncio.gather(send_task, receive_task)
     finally:
         print(f"Connection closed for {addr}")
         writer.close()
         await writer.wait_closed()
+
+async def send_data(writer):
+    global currentData, stop_event
+    try:
+        while not stop_event.is_set():
+            message = json.dumps(currentData)
+            writer.write(message.encode() + b'\n')
+            await writer.drain()
+            await asyncio.sleep(0.033)  # 30 FPS
+    except Exception as e:
+        print(f"Error sending data: {e}")
+
+async def receive_data(reader):
+    global stop_event, currentData
+    try:
+        while not stop_event.is_set():
+            data = await reader.readline()
+            if not data:
+                break
+            message = data.decode().strip()
+            try:
+                received_json = json.loads(message)
+                currentData['received_data'] = received_json
+                print("\nReceived Truck Data:")
+                print("-" * 30)
+                print(f"Position: (x: {received_json['position']['x']:.2f}, y: {received_json['position']['y']:.2f})")
+                print(f"Velocity: (x: {received_json['velocity']['x']:.2f}, y: {received_json['velocity']['y']:.2f})")
+                print(f"Acceleration: {received_json['acceleration']:.2f}")
+                print(f"Turn Angle: {received_json['turn_angle']:.2f}")
+                print(f"Next Speed: {received_json['next_speed']:.2f}")
+                print("-" * 30)
+            except json.JSONDecodeError:
+                print(f"Error decoding JSON: {message}")
+            except KeyError as e:
+                print(f"Missing key in JSON data: {e}")
+    except Exception as e:
+        print(f"Error receiving data: {e}")
 
 async def start_server():
     global server, stop_event
@@ -143,52 +175,59 @@ def plugin(data):
         tempData[key] = convert_ndarrays(data[key])
     
     currentData = tempData
+
+    if 'received_data' in currentData:
+        data['received_data'] = currentData['received_data']
+        print(f"Passing received data to other plugins: {data['received_data']}")
+
     return data
 
 class UI():
-    try: # The panel is in a try loop so that the logger can log errors if they occur
-        
+    try:
         def __init__(self, master) -> None:
-            self.master = master # "master" is the mainUI window
+            self.master = master
             self.exampleFunction()
         
         def destroy(self):
             self.done = True
             self.root.destroy()
             del self
-
         
         def exampleFunction(self):
-            
             try:
-                self.root.destroy() # Load the UI each time this plugin is called
-            except: pass
+                self.root.destroy()
+            except:
+                pass
             
             self.root = tk.Canvas(self.master, width=600, height=520, border=0, highlightthickness=0)
-            self.root.grid_propagate(0) # Don't fit the canvast to the widgets
+            self.root.grid_propagate(0)
             self.root.pack_propagate(0)
 
-            def savenewport():
-                print(self.newport.get())
-                settings.CreateSettings("ExternalAPI", "port", self.newport.get())
+            def save_ports():
+                settings.CreateSettings("ExternalAPI-Socket", "send_port", self.send_port.get())
+                settings.CreateSettings("ExternalAPI-Socket", "receive_port", self.receive_port.get())
+                print(f"Send Port: {self.send_port.get()}, Receive Port: {self.receive_port.get()}")
+
             def validate_entry(text):
-                # Make sure that only integers can be typed
                 return text.isdecimal()
 
-            ttk.Label(self.root, text="Port").grid(row=1, padx=5, pady=5)
-            self.newport = tk.IntVar()
-            ttk.Entry(self.root, validate="key", textvariable=self.newport,
-    validatecommand=(self.root.register(validate_entry), "%S")).grid(row=2, padx=5, pady=5)
-            ttk.Button(self.root, text="Save", command=savenewport).grid(row=3, padx=5, pady=5)
+            ttk.Label(self.root, text="Send Port").grid(row=1, padx=5, pady=5)
+            self.send_port = tk.IntVar(value=SEND_PORT)
+            ttk.Entry(self.root, validate="key", textvariable=self.send_port,
+                validatecommand=(self.root.register(validate_entry), "%S")).grid(row=2, padx=5, pady=5)
 
-            ttk.button(self.root, text="button").grid()
+            ttk.Label(self.root, text="Receive Port").grid(row=3, padx=5, pady=5)
+            self.receive_port = tk.IntVar(value=RECEIVE_PORT)
+            ttk.Entry(self.root, validate="key", textvariable=self.receive_port,
+                validatecommand=(self.root.register(validate_entry), "%S")).grid(row=4, padx=5, pady=5)
+
+            ttk.Button(self.root, text="Save", command=save_ports).grid(row=5, padx=5, pady=5)
+
             self.root.pack(anchor="center", expand=False)
             self.root.update()
         
-        
-        def update(self, data): # When the panel is open this function is called each frame 
+        def update(self, data):
             self.root.update()
-    
     
     except Exception as ex:
         print(ex.args)
