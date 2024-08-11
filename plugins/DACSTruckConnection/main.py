@@ -48,6 +48,8 @@ class Truck:
         self.vector = data.get("truckVector", self.vector)
 
     def __eq__(self, other):
+        if not isinstance(other, Truck):
+            return False
         return self.id == other.id
 
     def __hash__(self):
@@ -57,7 +59,6 @@ trucks = {}
 current_truck = None
 websocket_server = None
 stop_event = None
-
 
 async def handle_client(websocket, path):
     truck_id = str(uuid.uuid4())
@@ -85,8 +86,11 @@ async def broadcast_truck_left(left_truck):
 
 async def broadcast_to_all(message, exclude=None):
     for truck in trucks.values():
-        if truck != exclude and truck.websocket:
-            await truck.websocket.send(message)
+        if truck is not exclude and truck.websocket:
+            try:
+                await truck.websocket.send(message)
+            except websockets.exceptions.WebSocketException:
+                print(f"Failed to send message to truck {truck.id}. Websocket might be closed.")
 
 async def process_truck_data(truck):
     for other_truck in trucks.values():
@@ -105,7 +109,7 @@ async def process_truck_data(truck):
 
 async def negotiate_leader_follower(truck1, truck2):
     if truck1.is_leader and truck2.is_leader:
-        # If both are leaders or neither, randomly choose one
+        # If both are leaders, randomly choose one
         new_leader = random.choice([truck1, truck2])
         new_follower = truck2 if new_leader == truck1 else truck1
         new_leader.is_leader = True
@@ -116,7 +120,8 @@ async def negotiate_leader_follower(truck1, truck2):
     elif truck2.is_leader:
         truck1.leader = truck2
     else:
-        new_leader = random.choice([truck1, truck2])
+        # If neither is a leader, choose based on some criteria (e.g., truck ID)
+        new_leader = truck1 if truck1.id < truck2.id else truck2
         new_follower = truck2 if new_leader == truck1 else truck1
         new_leader.is_leader = True
         new_follower.leader = new_leader
@@ -134,38 +139,36 @@ async def reset_leader_follower(truck1, truck2):
 
 async def update_leader_status(truck):
     if truck.websocket:
-        message = json.dumps({
-            "type": "leader_status_update",
-            "is_leader": truck.is_leader,
-            "leader_id": truck.leader.id if truck.leader else None
-        })
-        await truck.websocket.send(message)
+        try:
+            message = json.dumps({
+                "type": "leader_status_update",
+                "is_leader": truck.is_leader,
+                "leader_id": truck.leader.id if truck.leader else None
+            })
+            await truck.websocket.send(message)
+        except websockets.exceptions.WebSocketException:
+            print(f"Failed to update leader status for truck {truck.id}. Websocket might be closed.")
+    
     # Notify all connected trucks about the change
     await broadcast_to_all(json.dumps({
         "type": "truck_status_change",
         "truck_id": truck.id,
         "is_leader": truck.is_leader
-    }))
-
-def change_leader_status(is_leader):
-    global current_truck
-    if current_truck:
-        current_truck.is_leader = is_leader
-        current_truck.leader = current_truck if is_leader else None
-        asyncio.run(update_leader_status(current_truck))
-        settings.CreateSettings("ETS2DynamicTruckConnection", "is_leader", is_leader)
-        print(f"Changed leader status to: {'Leader' if is_leader else 'Follower'}")
+    }), exclude=truck)
 
 async def notify_server(truck1, truck2):
     server_uri = f"ws://localhost:{SERVER_PORT}"
-    async with websockets.connect(server_uri) as server_ws:
-        message = json.dumps({
-            "command": "launch_gbpplanner",
-            "truck1": {"id": truck1.id, "position": truck1.position, "is_leader": truck1.is_leader},
-            "truck2": {"id": truck2.id, "position": truck2.position, "is_leader": truck2.is_leader}
-        })
-        await server_ws.send(message)
-    print(f"Notified server: Trucks {truck1.id} and {truck2.id} connected")
+    try:
+        async with websockets.connect(server_uri) as server_ws:
+            message = json.dumps({
+                "command": "launch_gbpplanner",
+                "truck1": {"id": truck1.id, "position": truck1.position, "is_leader": truck1.is_leader},
+                "truck2": {"id": truck2.id, "position": truck2.position, "is_leader": truck2.is_leader}
+            })
+            await server_ws.send(message)
+        print(f"Notified server: Trucks {truck1.id} and {truck2.id} connected")
+    except websockets.exceptions.WebSocketException:
+        print(f"Failed to notify server about connection between trucks {truck1.id} and {truck2.id}")
 
 def calculate_distance(pos1, pos2):
     return math.sqrt((pos1["coordinateX"] - pos2["coordinateX"])**2 + 
@@ -193,7 +196,19 @@ async def send_current_truck_data():
             "truckPlacement": current_truck.position,
             "truckVector": current_truck.vector
         }
-        await current_truck.websocket.send(json.dumps(data))
+        try:
+            await current_truck.websocket.send(json.dumps(data))
+        except websockets.exceptions.WebSocketException:
+            print(f"Failed to send current truck data. Websocket might be closed.")
+
+def change_leader_status(is_leader):
+    global current_truck
+    if current_truck:
+        current_truck.is_leader = is_leader
+        current_truck.leader = current_truck if is_leader else None
+        asyncio.create_task(update_leader_status(current_truck))
+        settings.CreateSettings("ETS2DynamicTruckConnection", "is_leader", is_leader)
+        print(f"Changed leader status to: {'Leader' if is_leader else 'Follower'}")
 
 def onEnable():
     global server_task, current_truck
@@ -227,7 +242,7 @@ def plugin(data):
             "velocityX": data["api"]["truckVector"].get("lv_accelerationX", 0.0),
             "velocityZ": data["api"]["truckVector"].get("lv_accelerationZ", 0.0)
         }
-        asyncio.run(send_current_truck_data())
+        asyncio.create_task(send_current_truck_data())
     return data
 
 class UI():
