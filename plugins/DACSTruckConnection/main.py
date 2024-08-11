@@ -58,6 +58,7 @@ current_truck = None
 websocket_server = None
 stop_event = None
 
+
 async def handle_client(websocket, path):
     truck_id = str(uuid.uuid4())
     truck = Truck(truck_id, websocket)
@@ -139,6 +140,21 @@ async def update_leader_status(truck):
             "leader_id": truck.leader.id if truck.leader else None
         })
         await truck.websocket.send(message)
+    # Notify all connected trucks about the change
+    await broadcast_to_all(json.dumps({
+        "type": "truck_status_change",
+        "truck_id": truck.id,
+        "is_leader": truck.is_leader
+    }))
+
+def change_leader_status(is_leader):
+    global current_truck
+    if current_truck:
+        current_truck.is_leader = is_leader
+        current_truck.leader = current_truck if is_leader else None
+        asyncio.run(update_leader_status(current_truck))
+        settings.CreateSettings("ETS2DynamicTruckConnection", "is_leader", is_leader)
+        print(f"Changed leader status to: {'Leader' if is_leader else 'Follower'}")
 
 async def notify_server(truck1, truck2):
     server_uri = f"ws://localhost:{SERVER_PORT}"
@@ -185,6 +201,8 @@ def onEnable():
     server_task.start()
     current_truck = Truck("current_truck", is_leader=IS_LEADER)
     trucks[current_truck.id] = current_truck
+    if hasattr(PluginInfo, 'ui_instance') and PluginInfo.ui_instance:
+        PluginInfo.ui_instance.is_leader_var.set(IS_LEADER)
 
 def onDisable():
     global stop_event, websocket_server, server_task, current_truck
@@ -226,18 +244,31 @@ class UI():
         ttk.Label(self.root, text=f"Truck server port: {TRUCK_PORT}").grid(row=1, column=0, padx=5, pady=5)
         ttk.Label(self.root, text=f"GBP Planner server port: {SERVER_PORT}").grid(row=2, column=0, padx=5, pady=5)
         ttk.Label(self.root, text=f"Connection range: {CONNECTION_RANGE} meters").grid(row=3, column=0, padx=5, pady=5)
-        ttk.Label(self.root, text=f"Initial leader status: {'Leader' if IS_LEADER else 'Follower'}").grid(row=4, column=0, padx=5, pady=5)
 
         self.truck_count_label = ttk.Label(self.root, text="Connected trucks: 0")
-        self.truck_count_label.grid(row=5, column=0, padx=5, pady=5)
+        self.truck_count_label.grid(row=4, column=0, padx=5, pady=5)
 
         self.position_label = ttk.Label(self.root, text="Current Position: (0, 0)")
-        self.position_label.grid(row=6, column=0, padx=5, pady=5)
+        self.position_label.grid(row=5, column=0, padx=5, pady=5)
 
         self.leader_status_label = ttk.Label(self.root, text="Leader Status: N/A")
-        self.leader_status_label.grid(row=7, column=0, padx=5, pady=5)
+        self.leader_status_label.grid(row=6, column=0, padx=5, pady=5)
+
+        # Leader/Follower checkbox
+        self.is_leader_var = tk.BooleanVar(value=IS_LEADER)
+        self.leader_checkbox = ttk.Checkbutton(
+            self.root,
+            text="Set as Leader",
+            variable=self.is_leader_var,
+            command=self.on_leader_checkbox_change
+        )
+        self.leader_checkbox.grid(row=7, column=0, padx=5, pady=5)
 
         self.root.pack(anchor="center", expand=False)
+
+    def on_leader_checkbox_change(self):
+        is_leader = self.is_leader_var.get()
+        change_leader_status(is_leader)
 
     def destroy(self):
         self.root.destroy()
@@ -248,4 +279,5 @@ class UI():
             self.position_label.config(text=f"Current Position: ({current_truck.position['coordinateX']:.2f}, {current_truck.position['coordinateZ']:.2f})")
             leader_status = "Leader" if current_truck.is_leader else f"Follower (Leader: {current_truck.leader.id if current_truck.leader else 'None'})"
             self.leader_status_label.config(text=f"Leader Status: {leader_status}")
+            self.is_leader_var.set(current_truck.is_leader)
         self.root.update()
