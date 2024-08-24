@@ -64,3 +64,5 @@ screenshot.png
 logs/
 ETS2LA/
 frontend/
+branch_summary_*.txt
+generate_detailed_summary.sh
