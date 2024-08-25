@@ -166,7 +166,7 @@ def plugin(data):
         # Ensure the window stays on top even when not resizing
         hwnd = win32gui.FindWindow(None, name_window)
         win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, 
-                              win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+                            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
 
     cv2.setWindowProperty(name_window, cv2.WND_PROP_TOPMOST, 1)
 
