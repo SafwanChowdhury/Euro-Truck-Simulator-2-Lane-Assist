@@ -29,7 +29,8 @@ import uuid
 port = 39846
 
 currentData = {}
-received_json = {}
+received_iteration_data = {}
+received_truck_data = {}
 other_robots_data = {}
 server = None
 server_task = None
@@ -140,7 +141,7 @@ def onDisable():
     print("Server stopped")
 
 def plugin(data):
-    global currentData, received_json, other_robots_data, host_id
+    global currentData, received_iteration_data, other_robots_data, host_id
     tempData = {
         "api": {
             "truckPlacement": {
@@ -179,7 +180,7 @@ def plugin(data):
     
     currentData = tempData
     data["externalapi"] = {}
-    data["externalapi"]["receivedIterationData"] = received_json
+    data["externalapi"]["receivedJSON"] = received_iteration_data
     data["externalapi"]["otherRobotsData"] = other_robots_data
     data["externalapi"]["host_id"] = host_id
     return data
