@@ -93,36 +93,66 @@ def plugin(data):
 
     frame = frame_original.copy()
 
-    if "last" in data and "externalapi" in data["last"]:
-        received_json = data["last"]["externalapi"].get("receivedJSON", {})
-        other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
+    if "last" in data and "externalapi" in data["last"] and "receivedJSON" in data["last"]["externalapi"]:
+        received_json = data["last"]["externalapi"]["receivedJSON"]
         host_id = data["last"]["externalapi"].get("host_id")
-
-        # Display data for the current truck
+        
+        # Ensure received_json is not None and is a dictionary
         if received_json and isinstance(received_json, dict):
+            # Check if the host_id matches
             if received_json.get('host_id') == host_id:
                 position = received_json.get('position', {})
                 velocity = received_json.get('velocity', {})
                 
-                draw_text(frame, "Current Truck (Robot ID: {}):".format(received_json.get('robot_id')), 0.1, 0.1, "")
-                draw_text(frame, "Position X:", 0.1, 0.2, position.get('x', 0))
-                draw_text(frame, "Position Y:", 0.1, 0.3, position.get('y', 0))
-                draw_text(frame, "Velocity X (mph):", 0.1, 0.4, mpsToMPH(velocity.get('x', 0)))
-                draw_text(frame, "Velocity Y (mph):", 0.1, 0.5, mpsToMPH(velocity.get('y', 0)))
-                draw_text(frame, "Acceleration (mph/s):", 0.1, 0.6, mpsToMPH(received_json.get('acceleration', 0)))
-                draw_text(frame, "Turn Angle:", 0.1, 0.7, received_json.get('turn_angle', 0))
-                draw_text(frame, "Next Speed (mph):", 0.1, 0.8, mpsToMPH(received_json.get('next_speed', 0)))
+                position_x = position.get('x', 0)
+                position_y = position.get('y', 0)
+                velocity_x = mpsToMPH(velocity.get('x', 0))
+                velocity_y = mpsToMPH(velocity.get('y', 0))
+                acceleration = mpsToMPH(received_json.get('acceleration', 0))
+                turn_angle = received_json.get('turn_angle', 0)
+                next_speed = mpsToMPH(received_json.get('next_speed', 0))
 
-        # Display data for other trucks
-        if other_trucks_data and isinstance(other_trucks_data, list):
-            for i, truck in enumerate(other_trucks_data):
-                y_offset = 0.1 * (i + 1)
-                draw_text(frame, f"Other Truck (Robot ID: {truck.get('robot_id')})", 0.5, y_offset, "")
+                draw_text(frame, "Position X:", 0.1, 0.2, position_x)
+                draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
+                draw_text(frame, "Velocity X (mph):", 0.1, 0.4, velocity_x)
+                draw_text(frame, "Velocity Y (mph):", 0.1, 0.5, velocity_y)
+                draw_text(frame, "Acceleration (mph/s):", 0.1, 0.6, acceleration)
+                draw_text(frame, "Turn Angle:", 0.1, 0.7, turn_angle)
+                draw_text(frame, "Next Speed (mph):", 0.1, 0.8, next_speed)
+            else:
+                cv2.putText(frame, "Received data is not for this host", (int(0.1*width_frame), int(0.5*height_frame)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+            
+            # Display other trucks' data
+            other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
+            y_offset = 0.9  # Starting Y position offset for displaying other trucks data
+            
+            for truck in other_trucks_data:
+                truck_id = truck.get('robot_id')
                 position = truck.get('position', {})
                 velocity = truck.get('velocity', {})
-                draw_text(frame, "Position:", 0.5, y_offset + 0.05, f"({position.get('x', 0):.2f}, {position.get('y', 0):.2f})")
-                draw_text(frame, "Velocity (mph):", 0.5, y_offset + 0.1, f"({mpsToMPH(velocity.get('x', 0)):.2f}, {mpsToMPH(velocity.get('y', 0)):.2f})")
+                
+                position_x = position.get('x', 0)
+                position_y = position.get('y', 0)
+                velocity_x = mpsToMPH(velocity.get('x', 0))
+                velocity_y = mpsToMPH(velocity.get('y', 0))
 
+                draw_text(frame, f"Truck ID {truck_id} - Pos X:", 0.1, y_offset, position_x)
+                y_offset += 0.1
+                draw_text(frame, f"Truck ID {truck_id} - Pos Y:", 0.1, y_offset, position_y)
+                y_offset += 0.1
+                draw_text(frame, f"Truck ID {truck_id} - Vel X (mph):", 0.1, y_offset, velocity_x)
+                y_offset += 0.1
+                draw_text(frame, f"Truck ID {truck_id} - Vel Y (mph):", 0.1, y_offset, velocity_y)
+                y_offset += 0.1
+                
+                # Adjust the offset if needed to avoid overlapping with other information
+                if y_offset > 0.9:
+                    y_offset = 0.1
+            
+        else:
+            cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
     else:
         cv2.putText(frame, "Waiting for GBPPlanner data...", (int(0.1*width_frame), int(0.5*height_frame)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
@@ -133,6 +163,7 @@ def plugin(data):
         cv2.resizeWindow(name_window, width_frame, height_frame)
         handle_window_properties(name_window)
     else:
+        # Ensure the window stays on top even when not resizing
         hwnd = win32gui.FindWindow(None, name_window)
         win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, 
                               win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
@@ -140,6 +171,7 @@ def plugin(data):
     cv2.setWindowProperty(name_window, cv2.WND_PROP_TOPMOST, 1)
 
     return data
+
 
 def onEnable():
     LoadSettings()
