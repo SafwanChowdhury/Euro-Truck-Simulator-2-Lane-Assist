@@ -29,9 +29,8 @@ import uuid
 port = 39846
 
 currentData = {}
-received_iteration_data = {}
-received_truck_data = {}
-other_robots_data = {}
+received_json = {}
+other_trucks_data = {}
 server = None
 server_task = None
 stop_event = None
@@ -73,7 +72,7 @@ async def send_data(writer):
         print(f"Error sending data: {e}")
 
 async def receive_data(reader):
-    global stop_event, received_iteration_data, other_robots_data, host_id
+    global stop_event, received_json, other_trucks_data, host_id
     try:
         while not stop_event.is_set():
             data = await reader.readline()
@@ -82,15 +81,15 @@ async def receive_data(reader):
             message = data.decode().strip()
             try:
                 json_data = json.loads(message)
-                if json_data.get('host_id') == host_id:
-                    if 'other_robots' in json_data:
-                        other_robots_data = json_data['other_robots']
-                    elif 'iteration_data' in json_data:
-                        received_iteration_data = json_data['iteration_data']
-                    else:
-                        print(f"Unexpected data structure: {json_data}")
+                if 'iteration_data' in json_data and 'all_trucks_data' in json_data:
+                    # Extract own iteration data
+                    if json_data['iteration_data']['unique_id'] == host_id:
+                        received_json = json_data['iteration_data']
+                    
+                    # Extract data of other trucks
+                    other_trucks_data = [truck for truck in json_data['all_trucks_data'] if truck['unique_id'] != host_id]
                 else:
-                    print(f"Received data for different host: {json_data.get('host_id')}")
+                    print(f"Unexpected data structure: {json_data}")
             except json.JSONDecodeError:
                 print(f"Error decoding JSON: {message}")
             except KeyError as e:
@@ -141,7 +140,7 @@ def onDisable():
     print("Server stopped")
 
 def plugin(data):
-    global currentData, received_iteration_data, other_robots_data, host_id
+    global currentData, received_json, other_trucks_data, host_id
     tempData = {
         "api": {
             "truckPlacement": {
@@ -180,9 +179,11 @@ def plugin(data):
     
     currentData = tempData
     data["externalapi"] = {}
-    data["externalapi"]["receivedJSON"] = received_iteration_data
-    data["externalapi"]["otherRobotsData"] = other_robots_data
+    data["externalapi"]["receivedJSON"] = received_json
+    data["externalapi"]["otherTrucksData"] = other_trucks_data
     data["externalapi"]["host_id"] = host_id
+    return data
+
     return data
 
 class UI():
