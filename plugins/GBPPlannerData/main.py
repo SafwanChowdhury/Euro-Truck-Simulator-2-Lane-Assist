@@ -69,10 +69,8 @@ def handle_window_properties(window_name):
     win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_SMALL, hicon)
     win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_BIG, hicon)
 
-def speedCalc(speed):
-    speed = 0 if speed == 0 else (0.00795692 * speed**2 + 1.97515965 * speed + 2.04417437) #calculated conversion from game speed to mph
-    speed = round(speed, 0)
-    return speed
+def mpsToMPH(speed):
+    return speed * 2.23694  # Convert m/s to mph
 
 def plugin(data):
     global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
@@ -105,42 +103,25 @@ def plugin(data):
             
             position_x = position.get('x', 0)
             position_y = position.get('y', 0)
-            velocity_x = velocity.get('x', 0)
-            velocity_y = velocity.get('y', 0)
-            acceleration = received_json.get('acceleration', 0)
+            velocity_x = mpsToMPH(velocity.get('x', 0))
+            velocity_y = mpsToMPH(velocity.get('y', 0))
+            acceleration = mpsToMPH(received_json.get('acceleration', 0))
             turn_angle = received_json.get('turn_angle', 0)
-            next_speed = received_json.get('next_speed', 0)
+            next_speed = mpsToMPH(received_json.get('next_speed', 0))
 
             draw_text(frame, "Position X:", 0.1, 0.2, position_x)
             draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
-            draw_text(frame, "Velocity X:", 0.1, 0.4, velocity_x)
-            draw_text(frame, "Velocity Y:", 0.1, 0.5, velocity_y)
-            draw_text(frame, "Acceleration:", 0.1, 0.6, acceleration)
+            draw_text(frame, "Velocity X (mph):", 0.1, 0.4, velocity_x)
+            draw_text(frame, "Velocity Y (mph):", 0.1, 0.5, velocity_y)
+            draw_text(frame, "Acceleration (mph/s):", 0.1, 0.6, acceleration)
             draw_text(frame, "Turn Angle:", 0.1, 0.7, turn_angle)
-            draw_text(frame, "Next Speed:", 0.1, 0.8, speedCalc(next_speed))
+            draw_text(frame, "Next Speed (mph):", 0.1, 0.8, next_speed)
         else:
             cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
     else:
         cv2.putText(frame, "Waiting for GBPPlanner data...", (int(0.1*width_frame), int(0.5*height_frame)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
-
-
-    # position_x = 0
-    # position_y = 0
-    # velocity_x = data["api"]["truckVector"]["lv_accelerationX"]
-    # velocity_y = data["api"]["truckVector"]["lv_accelerationZ"]
-    # speed = data["api"]["truckFloat"]["speed"]
-    # turn_angle = 0
-    # next_speed = data["api"]["truckFloat"]["cruiseControlSpeed"]
-
-    # draw_text(frame, "Position X:", 0.1, 0.2, position_x)
-    # draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
-    # draw_text(frame, "Velocity X:", 0.1, 0.4, velocity_x)
-    # draw_text(frame, "Velocity Y:", 0.1, 0.5, -speedCalc(velocity_y))
-    # draw_text(frame, "Speed:", 0.1, 0.6, speedCalc(speed))
-    # draw_text(frame, "Turn Angle:", 0.1, 0.7, turn_angle)
-    # draw_text(frame, "Next Speed:", 0.1, 0.8, speedCalc(next_speed))
 
     cv2.imshow(name_window, frame)
 

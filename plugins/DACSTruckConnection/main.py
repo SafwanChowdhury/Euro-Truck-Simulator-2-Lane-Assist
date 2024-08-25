@@ -16,11 +16,16 @@ import threading
 import math
 import uuid
 import random
+import cv2
+import numpy as np
+import win32gui, win32con
+from ctypes import windll, byref, c_int, sizeof
+import socket
 
 PluginInfo = PluginInformation(
     name="DACSTruckConnection",
     description="Handles dynamic truck connections with leader/follower dynamics.",
-    version="0.4",
+    version="0.5",
     author="SafwanChowdhury",
     url="https://github.com/SafwanChowdhury/Euro-Truck-Simulator-2-Lane-Assist",
     type="dynamic",
@@ -32,6 +37,15 @@ TRUCK_PORT = settings.GetSettings("DACSTruckConnection", "truck_port") or 39850
 SERVER_PORT = settings.GetSettings("DACSTruckConnection", "server_port") or 39851
 CONNECTION_RANGE = settings.GetSettings("DACSTruckConnection", "connection_range") or 300  # meters
 IS_LEADER = settings.GetSettings("DACSTruckConnection", "is_leader") or False
+
+# Global variables
+trucks = {}
+current_truck = None
+websocket_server = None
+stop_event = None
+window_name = "DACS Truck Connection"
+frame = None
+server_running = False
 
 class Truck:
     def __init__(self, id, websocket=None, is_leader=False):
@@ -54,11 +68,6 @@ class Truck:
 
     def __hash__(self):
         return hash(self.id)
-
-trucks = {}
-current_truck = None
-websocket_server = None
-stop_event = None
 
 async def handle_client(websocket, path):
     truck_id = str(uuid.uuid4())
@@ -109,7 +118,6 @@ async def process_truck_data(truck):
 
 async def negotiate_leader_follower(truck1, truck2):
     if truck1.is_leader and truck2.is_leader:
-        # If both are leaders, randomly choose one
         new_leader = random.choice([truck1, truck2])
         new_follower = truck2 if new_leader == truck1 else truck1
         new_leader.is_leader = True
@@ -120,7 +128,6 @@ async def negotiate_leader_follower(truck1, truck2):
     elif truck2.is_leader:
         truck1.leader = truck2
     else:
-        # If neither is a leader, choose based on some criteria (e.g., truck ID)
         new_leader = truck1 if truck1.id < truck2.id else truck2
         new_follower = truck2 if new_leader == truck1 else truck1
         new_leader.is_leader = True
@@ -149,7 +156,6 @@ async def update_leader_status(truck):
         except websockets.exceptions.WebSocketException:
             print(f"Failed to update leader status for truck {truck.id}. Websocket might be closed.")
     
-    # Notify all connected trucks about the change
     await broadcast_to_all(json.dumps({
         "type": "truck_status_change",
         "truck_id": truck.id,
@@ -175,19 +181,39 @@ def calculate_distance(pos1, pos2):
                      (pos1["coordinateZ"] - pos2["coordinateZ"])**2)
 
 async def start_server():
-    global websocket_server, stop_event
+    global websocket_server, stop_event, server_running
+    if server_running:
+        print("Server is already running")
+        return
+    
     stop_event = asyncio.Event()
-    websocket_server = await websockets.serve(handle_client, "0.0.0.0", TRUCK_PORT)
-    print(f"Websocket server started on 0.0.0.0:{TRUCK_PORT}")
-    await stop_event.wait()
+    try:
+        websocket_server = await websockets.serve(handle_client, "0.0.0.0", TRUCK_PORT)
+        server_running = True
+        print(f"Websocket server started on 0.0.0.0:{TRUCK_PORT}")
+        await stop_event.wait()
+    except Exception as e:
+        print(f"Error starting server: {e}")
+        print(f"Error details: {type(e).__name__}, {str(e)}")
+        server_running = False
 
 def run_server():
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(start_server())
+    except Exception as e:
+        print(f"Error in run_server: {e}")
+        print(f"Error details: {type(e).__name__}, {str(e)}")
     finally:
         loop.close()
+
+def check_port_availability(port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    result = sock.connect_ex(('127.0.0.1', port))
+    sock.close()
+    return result != 0
+
 
 async def send_current_truck_data():
     global current_truck
@@ -207,20 +233,59 @@ def change_leader_status(is_leader):
         current_truck.is_leader = is_leader
         current_truck.leader = current_truck if is_leader else None
         asyncio.create_task(update_leader_status(current_truck))
-        settings.CreateSettings("ETS2DynamicTruckConnection", "is_leader", is_leader)
+        settings.CreateSettings("DACSTruckConnection", "is_leader", is_leader)
         print(f"Changed leader status to: {'Leader' if is_leader else 'Follower'}")
+
+def create_window():
+    global window_name, frame
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(window_name, 400, 300)
+    frame = np.zeros((300, 400, 3), dtype=np.uint8)
+
+    hwnd = win32gui.FindWindow(None, window_name)
+    win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, 
+                          win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+    
+    windll.dwmapi.DwmSetWindowAttribute(hwnd, 35, byref(c_int(0x000000)), sizeof(c_int))
+
+def update_window():
+    global frame, current_truck, trucks
+    frame.fill(0)
+
+    # Display current truck info
+    if current_truck:
+        cv2.putText(frame, f"Current Truck ID: {current_truck.id[:8]}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(frame, f"Position: ({current_truck.position['coordinateX']:.2f}, {current_truck.position['coordinateZ']:.2f})", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(frame, f"Is Leader: {current_truck.is_leader}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        if current_truck.leader:
+            cv2.putText(frame, f"Leader: {current_truck.leader.id[:8]}", (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+    # Display connected trucks
+    y_offset = 150
+    cv2.putText(frame, f"Connected Trucks: {len(trucks)}", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    for i, truck in enumerate(trucks.values()):
+        if i > 4:  # Limit to 5 trucks to avoid overflow
+            break
+        y_offset += 30
+        cv2.putText(frame, f"ID: {truck.id[:8]}, Leader: {truck.is_leader}", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+    cv2.imshow(window_name, frame)
+    cv2.waitKey(1)
 
 def onEnable():
     global server_task, current_truck
-    server_task = threading.Thread(target=run_server)
-    server_task.start()
+    if not server_running:
+        if check_port_availability(TRUCK_PORT):
+            server_task = threading.Thread(target=run_server)
+            server_task.start()
+        else:
+            print(f"Port {TRUCK_PORT} is already in use. Cannot start the server.")
     current_truck = Truck("current_truck", is_leader=IS_LEADER)
     trucks[current_truck.id] = current_truck
-    if hasattr(PluginInfo, 'ui_instance') and PluginInfo.ui_instance:
-        PluginInfo.ui_instance.is_leader_var.set(IS_LEADER)
+    create_window()
 
 def onDisable():
-    global stop_event, websocket_server, server_task, current_truck
+    global stop_event, websocket_server, server_task, current_truck, server_running
     if stop_event:
         asyncio.run(stop_event.set())
     if websocket_server:
@@ -230,6 +295,8 @@ def onDisable():
     if current_truck:
         del trucks[current_truck.id]
         current_truck = None
+    server_running = False
+    cv2.destroyAllWindows()
 
 def plugin(data):
     global current_truck
@@ -243,6 +310,7 @@ def plugin(data):
             "velocityZ": data["api"]["truckVector"].get("lv_accelerationZ", 0.0)
         }
         asyncio.create_task(send_current_truck_data())
+    update_window()
     return data
 
 class UI():
@@ -251,25 +319,14 @@ class UI():
         self.create_ui()
 
     def create_ui(self):
-        self.root = tk.Canvas(self.master, width=600, height=520, border=0, highlightthickness=0)
-        self.root.grid_propagate(0)
-        self.root.pack_propagate(0)
+        self.root = tk.Canvas(self.master, width=400, height=300, border=0, highlightthickness=0)
+        self.root.pack(anchor="center", expand=False)
 
-        ttk.Label(self.root, text="ETS2 Dynamic Truck Connection Plugin").grid(row=0, column=0, padx=5, pady=5)
+        ttk.Label(self.root, text="DACS Truck Connection Plugin").grid(row=0, column=0, padx=5, pady=5)
         ttk.Label(self.root, text=f"Truck server port: {TRUCK_PORT}").grid(row=1, column=0, padx=5, pady=5)
         ttk.Label(self.root, text=f"GBP Planner server port: {SERVER_PORT}").grid(row=2, column=0, padx=5, pady=5)
         ttk.Label(self.root, text=f"Connection range: {CONNECTION_RANGE} meters").grid(row=3, column=0, padx=5, pady=5)
 
-        self.truck_count_label = ttk.Label(self.root, text="Connected trucks: 0")
-        self.truck_count_label.grid(row=4, column=0, padx=5, pady=5)
-
-        self.position_label = ttk.Label(self.root, text="Current Position: (0, 0)")
-        self.position_label.grid(row=5, column=0, padx=5, pady=5)
-
-        self.leader_status_label = ttk.Label(self.root, text="Leader Status: N/A")
-        self.leader_status_label.grid(row=6, column=0, padx=5, pady=5)
-
-        # Leader/Follower checkbox
         self.is_leader_var = tk.BooleanVar(value=IS_LEADER)
         self.leader_checkbox = ttk.Checkbutton(
             self.root,
@@ -277,9 +334,7 @@ class UI():
             variable=self.is_leader_var,
             command=self.on_leader_checkbox_change
         )
-        self.leader_checkbox.grid(row=7, column=0, padx=5, pady=5)
-
-        self.root.pack(anchor="center", expand=False)
+        self.leader_checkbox.grid(row=4, column=0, padx=5, pady=5)
 
     def on_leader_checkbox_change(self):
         is_leader = self.is_leader_var.get()
@@ -289,10 +344,4 @@ class UI():
         self.root.destroy()
 
     def update(self, data):
-        self.truck_count_label.config(text=f"Connected trucks: {len(trucks)}")
-        if current_truck:
-            self.position_label.config(text=f"Current Position: ({current_truck.position['coordinateX']:.2f}, {current_truck.position['coordinateZ']:.2f})")
-            leader_status = "Leader" if current_truck.is_leader else f"Follower (Leader: {current_truck.leader.id if current_truck.leader else 'None'})"
-            self.leader_status_label.config(text=f"Leader Status: {leader_status}")
-            self.is_leader_var.set(current_truck.is_leader)
         self.root.update()
