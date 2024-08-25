@@ -1,7 +1,7 @@
 """
-ETS2 Dynamic Truck Connection Plugin with Leader/Follower Dynamics
+ETS2 Dynamic Truck Connection Plugin with Leader/Follower Dynamics and Real-time Data Display
 This plugin handles dynamic truck connections, leader/follower negotiations,
-and integrates with ETS2LA for real-time position updates.
+integrates with ETS2LA for real-time position updates, and displays data in a pop-up window.
 """
 
 from plugins.plugin import PluginInformation
@@ -16,11 +16,16 @@ import threading
 import math
 import uuid
 import random
+import cv2
+import numpy as np
+import win32gui, win32con
+from ctypes import windll, byref, c_int, sizeof
+import pyautogui
 
 PluginInfo = PluginInformation(
     name="DACSTruckConnection",
-    description="Handles dynamic truck connections with leader/follower dynamics.",
-    version="0.4",
+    description="Handles dynamic truck connections with leader/follower dynamics and real-time data display.",
+    version="0.5",
     author="SafwanChowdhury",
     url="https://github.com/SafwanChowdhury/Euro-Truck-Simulator-2-Lane-Assist",
     type="dynamic",
@@ -32,6 +37,18 @@ TRUCK_PORT = settings.GetSettings("DACSTruckConnection", "truck_port") or 39850
 SERVER_PORT = settings.GetSettings("DACSTruckConnection", "server_port") or 39851
 CONNECTION_RANGE = settings.GetSettings("DACSTruckConnection", "connection_range") or 300  # meters
 IS_LEADER = settings.GetSettings("DACSTruckConnection", "is_leader") or False
+
+# OpenCV window constants
+name_window = "DACSTruckConnection Data"
+text_color = (255, 255, 255)
+
+# Global variables
+width_screen, height_screen = pyautogui.size()
+width_frame = settings.GetSettings("DACSTruckConnection", "width_frame", round(height_screen/2.5))
+height_frame = settings.GetSettings("DACSTruckConnection", "height_frame", round(height_screen/4))
+last_width_frame = width_frame
+last_height_frame = height_frame
+frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
 
 class Truck:
     def __init__(self, id, websocket=None, is_leader=False):
@@ -59,6 +76,40 @@ trucks = {}
 current_truck = None
 websocket_server = None
 stop_event = None
+
+def LoadSettings():
+    global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
+    width_frame = settings.GetSettings("DACSTruckConnection", "width_frame", round(height_screen/2.5))
+    height_frame = settings.GetSettings("DACSTruckConnection", "height_frame", round(height_screen/4))
+    last_width_frame = width_frame
+    last_height_frame = height_frame
+    frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
+
+def draw_text(frame, label, x_pos, y_pos, value):
+    current_text = f"{label} {value}"
+    fontscale = 0.7
+    thickness = 1
+
+    textsize, _ = cv2.getTextSize(current_text, cv2.FONT_HERSHEY_SIMPLEX, fontscale, thickness)
+    width, height = textsize
+
+    cv2.putText(frame, current_text, (round(x_pos * frame.shape[1]), round(y_pos * frame.shape[0] + height / 2)),
+                cv2.FONT_HERSHEY_SIMPLEX, fontscale, text_color, thickness)
+
+def handle_window_properties(window_name):
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    hwnd = win32gui.FindWindow(None, window_name)
+
+    win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, 
+                          win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+    
+    windll.dwmapi.DwmSetWindowAttribute(hwnd, 35, byref(c_int(0x000000)), sizeof(c_int))
+
+    icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
+    hicon = win32gui.LoadImage(None, f"{variables.PATH}assets/favicon.ico", win32con.IMAGE_ICON, 0, 0, icon_flags)
+
+    win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_SMALL, hicon)
+    win32gui.SendMessage(hwnd, win32con.WM_SETICON, win32con.ICON_BIG, hicon)
 
 async def handle_client(websocket, path):
     truck_id = str(uuid.uuid4())
@@ -109,7 +160,6 @@ async def process_truck_data(truck):
 
 async def negotiate_leader_follower(truck1, truck2):
     if truck1.is_leader and truck2.is_leader:
-        # If both are leaders, randomly choose one
         new_leader = random.choice([truck1, truck2])
         new_follower = truck2 if new_leader == truck1 else truck1
         new_leader.is_leader = True
@@ -120,7 +170,6 @@ async def negotiate_leader_follower(truck1, truck2):
     elif truck2.is_leader:
         truck1.leader = truck2
     else:
-        # If neither is a leader, choose based on some criteria (e.g., truck ID)
         new_leader = truck1 if truck1.id < truck2.id else truck2
         new_follower = truck2 if new_leader == truck1 else truck1
         new_leader.is_leader = True
@@ -149,7 +198,6 @@ async def update_leader_status(truck):
         except websockets.exceptions.WebSocketException:
             print(f"Failed to update leader status for truck {truck.id}. Websocket might be closed.")
     
-    # Notify all connected trucks about the change
     await broadcast_to_all(json.dumps({
         "type": "truck_status_change",
         "truck_id": truck.id,
@@ -189,17 +237,53 @@ def run_server():
     finally:
         loop.close()
 
-async def send_current_truck_data():
-    global current_truck
-    if current_truck and current_truck.websocket:
-        data = {
-            "truckPlacement": current_truck.position,
-            "truckVector": current_truck.vector
-        }
+async def update_ui():
+    global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
+
+    while True:
         try:
-            await current_truck.websocket.send(json.dumps(data))
-        except websockets.exceptions.WebSocketException:
-            print(f"Failed to send current truck data. Websocket might be closed.")
+            size_frame = cv2.getWindowImageRect(name_window)
+            width_frame, height_frame = size_frame[2], size_frame[3]
+            resize_frame = False
+        except:
+            width_frame, height_frame = last_width_frame, last_height_frame
+            resize_frame = True
+
+        if width_frame != last_width_frame or height_frame != last_height_frame:
+            if width_frame >= 50 and height_frame >= 50:
+                frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
+                settings.CreateSettings("DACSTruckConnection", "width_frame", width_frame)
+                settings.CreateSettings("DACSTruckConnection", "height_frame", height_frame)
+
+        last_width_frame, last_height_frame = width_frame, height_frame
+
+        frame = frame_original.copy()
+
+        draw_text(frame, "Connected trucks:", 0.1, 0.1, len(trucks))
+        if current_truck:
+            draw_text(frame, "Current Position X:", 0.1, 0.2, f"{current_truck.position['coordinateX']:.2f}")
+            draw_text(frame, "Current Position Z:", 0.1, 0.3, f"{current_truck.position['coordinateZ']:.2f}")
+            draw_text(frame, "Velocity X:", 0.1, 0.4, f"{current_truck.vector['velocityX']:.2f}")
+            draw_text(frame, "Velocity Z:", 0.1, 0.5, f"{current_truck.vector['velocityZ']:.2f}")
+            draw_text(frame, "Leader Status:", 0.1, 0.6, "Leader" if current_truck.is_leader else "Follower")
+            if current_truck.leader and not current_truck.is_leader:
+                draw_text(frame, "Leader ID:", 0.1, 0.7, current_truck.leader.id)
+        else:
+            draw_text(frame, "No current truck data", 0.1, 0.2, "")
+
+        cv2.imshow(name_window, frame)
+
+        if resize_frame:
+            cv2.resizeWindow(name_window, width_frame, height_frame)
+            handle_window_properties(name_window)
+        else:
+            hwnd = win32gui.FindWindow(None, name_window)
+            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, 
+                                  win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+
+        cv2.setWindowProperty(name_window, cv2.WND_PROP_TOPMOST, 1)
+
+        await asyncio.sleep(1/30)  # Update at 30 FPS
 
 def change_leader_status(is_leader):
     global current_truck
@@ -207,17 +291,17 @@ def change_leader_status(is_leader):
         current_truck.is_leader = is_leader
         current_truck.leader = current_truck if is_leader else None
         asyncio.create_task(update_leader_status(current_truck))
-        settings.CreateSettings("ETS2DynamicTruckConnection", "is_leader", is_leader)
+        settings.CreateSettings("DACSTruckConnection", "is_leader", is_leader)
         print(f"Changed leader status to: {'Leader' if is_leader else 'Follower'}")
 
 def onEnable():
     global server_task, current_truck
+    LoadSettings()
     server_task = threading.Thread(target=run_server)
     server_task.start()
     current_truck = Truck("current_truck", is_leader=IS_LEADER)
     trucks[current_truck.id] = current_truck
-    if hasattr(PluginInfo, 'ui_instance') and PluginInfo.ui_instance:
-        PluginInfo.ui_instance.is_leader_var.set(IS_LEADER)
+    asyncio.create_task(update_ui())
 
 def onDisable():
     global stop_event, websocket_server, server_task, current_truck
@@ -230,6 +314,7 @@ def onDisable():
     if current_truck:
         del trucks[current_truck.id]
         current_truck = None
+    cv2.destroyAllWindows()
 
 def plugin(data):
     global current_truck
@@ -242,7 +327,7 @@ def plugin(data):
             "velocityX": data["api"]["truckVector"].get("lv_accelerationX", 0.0),
             "velocityZ": data["api"]["truckVector"].get("lv_accelerationZ", 0.0)
         }
-        asyncio.create_task(send_current_truck_data())
+        asyncio.create_task(process_truck_data(current_truck))
     return data
 
 class UI():
@@ -255,21 +340,11 @@ class UI():
         self.root.grid_propagate(0)
         self.root.pack_propagate(0)
 
-        ttk.Label(self.root, text="ETS2 Dynamic Truck Connection Plugin").grid(row=0, column=0, padx=5, pady=5)
+        ttk.Label(self.root, text="DACSTruckConnection Settings").grid(row=0, column=0, padx=5, pady=5)
         ttk.Label(self.root, text=f"Truck server port: {TRUCK_PORT}").grid(row=1, column=0, padx=5, pady=5)
         ttk.Label(self.root, text=f"GBP Planner server port: {SERVER_PORT}").grid(row=2, column=0, padx=5, pady=5)
         ttk.Label(self.root, text=f"Connection range: {CONNECTION_RANGE} meters").grid(row=3, column=0, padx=5, pady=5)
 
-        self.truck_count_label = ttk.Label(self.root, text="Connected trucks: 0")
-        self.truck_count_label.grid(row=4, column=0, padx=5, pady=5)
-
-        self.position_label = ttk.Label(self.root, text="Current Position: (0, 0)")
-        self.position_label.grid(row=5, column=0, padx=5, pady=5)
-
-        self.leader_status_label = ttk.Label(self.root, text="Leader Status: N/A")
-        self.leader_status_label.grid(row=6, column=0, padx=5, pady=5)
-
-        # Leader/Follower checkbox
         self.is_leader_var = tk.BooleanVar(value=IS_LEADER)
         self.leader_checkbox = ttk.Checkbutton(
             self.root,
@@ -277,7 +352,7 @@ class UI():
             variable=self.is_leader_var,
             command=self.on_leader_checkbox_change
         )
-        self.leader_checkbox.grid(row=7, column=0, padx=5, pady=5)
+        self.leader_checkbox.grid(row=4, column=0, padx=5, pady=5)
 
         self.root.pack(anchor="center", expand=False)
 
@@ -289,10 +364,4 @@ class UI():
         self.root.destroy()
 
     def update(self, data):
-        self.truck_count_label.config(text=f"Connected trucks: {len(trucks)}")
-        if current_truck:
-            self.position_label.config(text=f"Current Position: ({current_truck.position['coordinateX']:.2f}, {current_truck.position['coordinateZ']:.2f})")
-            leader_status = "Leader" if current_truck.is_leader else f"Follower (Leader: {current_truck.leader.id if current_truck.leader else 'None'})"
-            self.leader_status_label.config(text=f"Leader Status: {leader_status}")
-            self.is_leader_var.set(current_truck.is_leader)
         self.root.update()
