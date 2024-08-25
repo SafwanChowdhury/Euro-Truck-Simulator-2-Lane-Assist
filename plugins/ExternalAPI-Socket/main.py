@@ -83,11 +83,11 @@ async def receive_data(reader):
                 json_data = json.loads(message)
                 if 'iteration_data' in json_data and 'all_trucks_data' in json_data:
                     # Extract own iteration data
-                    if json_data['iteration_data']['unique_id'] == host_id:
+                    if json_data['iteration_data']['host_id'] == host_id:
                         received_json = json_data['iteration_data']
                     
                     # Extract data of other trucks
-                    other_trucks_data = [truck for truck in json_data['all_trucks_data'] if truck['unique_id'] != host_id]
+                    other_trucks_data = [truck for truck in json_data['all_trucks_data'] if truck['host_id'] != host_id]
                 else:
                     print(f"Unexpected data structure: {json_data}")
             except json.JSONDecodeError:
