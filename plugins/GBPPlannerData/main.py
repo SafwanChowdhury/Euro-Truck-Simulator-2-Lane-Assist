@@ -95,33 +95,40 @@ def plugin(data):
 
     if "last" in data and "externalapi" in data["last"] and "receivedJSON" in data["last"]["externalapi"]:
         received_json = data["last"]["externalapi"]["receivedJSON"]
+        host_id = data["last"]["externalapi"].get("host_id")
         
         # Ensure received_json is not None and is a dictionary
         if received_json and isinstance(received_json, dict):
-            position = received_json.get('position', {})
-            velocity = received_json.get('velocity', {})
-            
-            position_x = position.get('x', 0)
-            position_y = position.get('y', 0)
-            velocity_x = mpsToMPH(velocity.get('x', 0))
-            velocity_y = mpsToMPH(velocity.get('y', 0))
-            acceleration = mpsToMPH(received_json.get('acceleration', 0))
-            turn_angle = received_json.get('turn_angle', 0)
-            next_speed = mpsToMPH(received_json.get('next_speed', 0))
+            # Check if the host_id matches
+            if received_json.get('host_id') == host_id:
+                position = received_json.get('position', {})
+                velocity = received_json.get('velocity', {})
+                
+                position_x = position.get('x', 0)
+                position_y = position.get('y', 0)
+                velocity_x = mpsToMPH(velocity.get('x', 0))
+                velocity_y = mpsToMPH(velocity.get('y', 0))
+                acceleration = mpsToMPH(received_json.get('acceleration', 0))
+                turn_angle = received_json.get('turn_angle', 0)
+                next_speed = mpsToMPH(received_json.get('next_speed', 0))
 
-            draw_text(frame, "Position X:", 0.1, 0.2, position_x)
-            draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
-            draw_text(frame, "Velocity X (mph):", 0.1, 0.4, velocity_x)
-            draw_text(frame, "Velocity Y (mph):", 0.1, 0.5, velocity_y)
-            draw_text(frame, "Acceleration (mph/s):", 0.1, 0.6, acceleration)
-            draw_text(frame, "Turn Angle:", 0.1, 0.7, turn_angle)
-            draw_text(frame, "Next Speed (mph):", 0.1, 0.8, next_speed)
+                draw_text(frame, "Position X:", 0.1, 0.2, position_x)
+                draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
+                draw_text(frame, "Velocity X (mph):", 0.1, 0.4, velocity_x)
+                draw_text(frame, "Velocity Y (mph):", 0.1, 0.5, velocity_y)
+                draw_text(frame, "Acceleration (mph/s):", 0.1, 0.6, acceleration)
+                draw_text(frame, "Turn Angle:", 0.1, 0.7, turn_angle)
+                draw_text(frame, "Next Speed (mph):", 0.1, 0.8, next_speed)
+            else:
+                cv2.putText(frame, "Received data is not for this host", (int(0.1*width_frame), int(0.5*height_frame)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
         else:
             cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
     else:
         cv2.putText(frame, "Waiting for GBPPlanner data...", (int(0.1*width_frame), int(0.5*height_frame)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+
 
     cv2.imshow(name_window, frame)
 

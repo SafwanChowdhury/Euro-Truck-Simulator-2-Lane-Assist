@@ -20,21 +20,20 @@ PluginInfo = PluginInformation(
 import tkinter as tk
 from tkinter import ttk
 import src.settings as settings
-import time
 import threading
 import numpy as np
 import json
 import asyncio
-import websockets
+import uuid
 
 port = 39846
-
 
 currentData = {}
 received_json = {}
 server = None
 server_task = None
 stop_event = None
+host_id = str(uuid.uuid4())
 
 def convert_ndarrays(obj):
     if isinstance(obj, np.ndarray):
@@ -60,10 +59,10 @@ async def handle_client(reader, writer):
         await writer.wait_closed()
 
 async def send_data(writer):
-    global currentData, stop_event
+    global currentData, stop_event, host_id
     try:
         while not stop_event.is_set():
-            message = json.dumps(currentData)
+            message = json.dumps({**currentData, "host_id": host_id})
             writer.write(message.encode() + b'\n')
             await writer.drain()
             await asyncio.sleep(0.033)  # 30 FPS
@@ -71,7 +70,7 @@ async def send_data(writer):
         print(f"Error sending data: {e}")
 
 async def receive_data(reader):
-    global stop_event, received_json
+    global stop_event, received_json, host_id
     try:
         while not stop_event.is_set():
             data = await reader.readline()
@@ -80,6 +79,11 @@ async def receive_data(reader):
             message = data.decode().strip()
             try:
                 received_json = json.loads(message)
+                if received_json.get('host_id') == host_id:
+                    # This message is for this host
+                    print(f"Received data for this host: {received_json}")
+                else:
+                    print(f"Received data for different host: {received_json.get('host_id')}")
             except json.JSONDecodeError:
                 print(f"Error decoding JSON: {message}")
             except KeyError as e:
@@ -130,7 +134,7 @@ def onDisable():
     print("Server stopped")
 
 def plugin(data):
-    global currentData, received_json
+    global currentData, received_json, host_id
     tempData = {
         "api": {
             "truckPlacement": {
@@ -141,7 +145,8 @@ def plugin(data):
                 "velocityX": 0.0,
                 "velocityZ": 0.0
             }
-        }
+        },
+        "host_id": host_id
     }
     
     for key in data:
@@ -169,6 +174,7 @@ def plugin(data):
     currentData = tempData
     data["externalapi"] = {}
     data["externalapi"]["receivedJSON"] = received_json
+    data["externalapi"]["host_id"] = host_id
     return data
 
 class UI():
