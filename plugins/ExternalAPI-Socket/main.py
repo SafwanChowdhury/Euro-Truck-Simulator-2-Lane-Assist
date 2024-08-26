@@ -150,6 +150,9 @@ def plugin(data):
             "truckVector": {
                 "velocityX": 0.0,
                 "velocityZ": 0.0
+            },
+            "truckFloat":{
+                "routeTime": 0.0,
             }
         },
         "host_id": host_id
@@ -173,6 +176,8 @@ def plugin(data):
             if "truckVector" in data[key]:
                 tempData["api"]["truckVector"]["velocityX"] = data[key]["truckVector"].get("lv_accelerationX", 0.0)
                 tempData["api"]["truckVector"]["velocityZ"] = data[key]["truckVector"].get("lv_accelerationZ", 0.0)
+            if "truckFloat" in data[key]:
+                tempData["api"]["truckFloat"]["routeTime"] = data[key]["truckFloat"].get("routeTime", 0.0)
             continue
         
         tempData[key] = convert_ndarrays(data[key])
