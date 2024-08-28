@@ -255,21 +255,48 @@ def plugin(data):
         if speedlimit != 0 and speedlimit > 0:
             last_speedlimit = speedlimit
         cruisecontrolspeed = round(data["api"]["truckFloat"]["cruiseControlSpeed"]*3.6, 1)
+        
+        # Get the required speed and override flag from the external API
+        # override_cruise_control = data["externalapi"]["receivedJSON"].get("override_cruise_control", False)
+        override_cruise_control = False
+        
+        if override_cruise_control:
+            required_speed_mph = data["externalapi"]["receivedJSON"].get("required_speed_mph", 0)
+            # Convert mph to km/h
+            required_speed_kmh = required_speed_mph * 1.60934
+            
+            # Use the required speed as the target speed
+            targetspeed = round(required_speed_kmh, 1)
+        else:
+            # Use the original logic to determine target speed
+            if speedlimit != 0 and speedlimit > 0:
+                targetspeed = speedlimit
+            else:
+                if last_speedlimit != 0 and last_speedlimit > 0:
+                    targetspeed = last_speedlimit
+                else:
+                    targetspeed = 30
+        
         if data["api"]["truckFloat"]["userThrottle"] > 0.1:
             user_accelerating = True
         else:
             user_accelerating = False
         user_throttle = data["api"]["truckFloat"]["userThrottle"]
+        
         if data["api"]["truckFloat"]["userBrake"] > 0.1:
             user_braking = True
         else:
             user_braking = False
+        
         if speed >= 0.5 and speed > last_speed:
             user_emergency_braking = False
+        
         if user_accelerating == True:
             user_emergency_braking = False
+        
         if data["api"]["truckFloat"]["userBrake"] > 0.9 and speed > 30 and DefaultSteering.enabled == True:
             user_emergency_braking = True
+        
         hazard_light = data["api"]["truckBool"]["lightsHazard"]
         park_brake = data["api"]["truckBool"]["parkBrake"]
         gamepaused = data["api"]["pause"]
@@ -405,36 +432,52 @@ def plugin(data):
                         user_accelerating = False
                     data["sdk"]["brake"] = 0
         else:
-            if speed > 30 and cruisecontrolspeed == 0 and auto_enable == True and wait_for_response == False and targetspeed != 0:
-                data["sdk"]["CruiseControl"] = True
-                wait_for_response = True
-                wait_for_response_timer = current_time
-                data["sdk"]["acceleration"] = 0
-                trafficlight_allow_acceleration = False
-            if cruisecontrolspeed != 0 and cruisecontrolspeed < targetspeed and wait_for_response == False and targetspeed != 0:
-                data["sdk"]["CruiseControlIncrease"] = True
-                wait_for_response = True
-                wait_for_response_timer = current_time
-            if cruisecontrolspeed != 0 and cruisecontrolspeed > targetspeed and wait_for_response == False and targetspeed != 0:
-                data["sdk"]["CruiseControlDecrease"] = True
-                wait_for_response = True
-                wait_for_response_timer = current_time
-            if speed < 30 and cruisecontrolspeed == 0 and targetspeed != 0 and trafficlight_accelerate == True and trafficlight_allow_acceleration == True and user_emergency_braking == False and do_lanedetected_stop == False:
-                data["sdk"]["acceleration"] = acceleration_strength
-                if user_throttle == acceleration_strength:
-                    user_accelerating = False
-                data["sdk"]["brake"] = 0
-            if targetspeed == 0 and abs(speed) > 1 and user_accelerating == False:
-                data["sdk"]["acceleration"] = 0
-                data["sdk"]["brake"] = brake_strength
-                user_emergency_braking_timer = current_time
-            elif targetspeed == 0 and abs(speed) < 1 and user_accelerating == False:
-                park_brake_target = True
-            if speed < 30 and cruisecontrolspeed == 0 and targetspeed != 0 and auto_accelerate == True and user_emergency_braking == False and do_lanedetected_stop == False:
-                data["sdk"]["acceleration"] = acceleration_strength
-                if user_throttle == acceleration_strength:
-                    user_accelerating = False
-                data["sdk"]["brake"] = 0
+            if override_cruise_control:
+                if speed > 30 and cruisecontrolspeed == 0 and auto_enable == True and wait_for_response == False and targetspeed != 0:
+                    data["sdk"]["CruiseControl"] = True
+                    wait_for_response = True
+                    wait_for_response_timer = current_time
+                    data["sdk"]["acceleration"] = 0
+                    trafficlight_allow_acceleration = False
+                if cruisecontrolspeed != 0 and cruisecontrolspeed < targetspeed and wait_for_response == False and targetspeed != 0:
+                    data["sdk"]["CruiseControlIncrease"] = True
+                    wait_for_response = True
+                    wait_for_response_timer = current_time
+                if cruisecontrolspeed != 0 and cruisecontrolspeed > targetspeed and wait_for_response == False and targetspeed != 0:
+                    data["sdk"]["CruiseControlDecrease"] = True
+                    wait_for_response = True
+                    wait_for_response_timer = current_time
+            else:
+                if speed > 30 and cruisecontrolspeed == 0 and auto_enable == True and wait_for_response == False and targetspeed != 0:
+                    data["sdk"]["CruiseControl"] = True
+                    wait_for_response = True
+                    wait_for_response_timer = current_time
+                    data["sdk"]["acceleration"] = 0
+                    trafficlight_allow_acceleration = False
+                if cruisecontrolspeed != 0 and cruisecontrolspeed < targetspeed and wait_for_response == False and targetspeed != 0:
+                    data["sdk"]["CruiseControlIncrease"] = True
+                    wait_for_response = True
+                    wait_for_response_timer = current_time
+                if cruisecontrolspeed != 0 and cruisecontrolspeed > targetspeed and wait_for_response == False and targetspeed != 0:
+                    data["sdk"]["CruiseControlDecrease"] = True
+                    wait_for_response = True
+                    wait_for_response_timer = current_time
+                if speed < 30 and cruisecontrolspeed == 0 and targetspeed != 0 and trafficlight_accelerate == True and trafficlight_allow_acceleration == True and user_emergency_braking == False and do_lanedetected_stop == False:
+                    data["sdk"]["acceleration"] = acceleration_strength
+                    if user_throttle == acceleration_strength:
+                        user_accelerating = False
+                    data["sdk"]["brake"] = 0
+                if targetspeed == 0 and abs(speed) > 1 and user_accelerating == False:
+                    data["sdk"]["acceleration"] = 0
+                    data["sdk"]["brake"] = brake_strength
+                    user_emergency_braking_timer = current_time
+                elif targetspeed == 0 and abs(speed) < 1 and user_accelerating == False:
+                    park_brake_target = True
+                if speed < 30 and cruisecontrolspeed == 0 and targetspeed != 0 and auto_accelerate == True and user_emergency_braking == False and do_lanedetected_stop == False:
+                    data["sdk"]["acceleration"] = acceleration_strength
+                    if user_throttle == acceleration_strength:
+                        user_accelerating = False
+                    data["sdk"]["brake"] = 0
     else:
         data["sdk"]["acceleration"] = 0
         data["sdk"]["brake"] = 0

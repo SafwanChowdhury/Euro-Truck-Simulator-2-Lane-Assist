@@ -85,6 +85,11 @@ async def receive_data(reader):
                     # Extract own iteration data
                     if json_data['iteration_data']['host_id'] == host_id:
                         received_json = json_data['iteration_data']
+                        # Make sure the required speed and override flag are included in received_json
+                        if 'required_speed_mph' not in received_json:
+                            print("Warning: required_speed_mph not found in iteration_data")
+                        if 'override_cruise_control' not in received_json:
+                            print("Warning: override_cruise_control not found in iteration_data")
                     
                     # Extract data of other trucks
                     other_trucks_data = [truck for truck in json_data['all_trucks_data'] if truck['host_id'] != host_id]
