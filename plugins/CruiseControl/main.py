@@ -257,13 +257,18 @@ def plugin(data):
         cruisecontrolspeed = round(data["api"]["truckFloat"]["cruiseControlSpeed"]*3.6, 1)
         
         # Get the required speed and override flag from the external API
-        # override_cruise_control = data["externalapi"]["receivedJSON"].get("override_cruise_control", False)
-        override_cruise_control = False
+        override_cruise_control = data["externalapi"]["receivedJSON"].get("override_cruise_control", False)
         
         if override_cruise_control:
             required_speed_mph = data["externalapi"]["receivedJSON"].get("required_speed_mph", 0)
             # Convert mph to km/h
             required_speed_kmh = required_speed_mph * 1.60934
+
+            if required_speed_kmh < 0:
+                required_speed_kmh = 0
+            
+            if required_speed_kmh > speedlimit + 10:
+                required_speed_kmh = speedlimit + 10
             
             # Use the required speed as the target speed
             targetspeed = round(required_speed_kmh, 1)
