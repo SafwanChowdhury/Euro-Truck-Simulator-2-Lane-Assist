@@ -263,7 +263,7 @@ def plugin(data):
         
         # Get the required speed and override flag from the external API
         override_cruise_control = data["externalapi"]["receivedJSON"].get("override_cruise_control", False)
-        
+        print("override_cruise_control", override_cruise_control)
         if override_cruise_control:
             required_speed_mph = data["externalapi"]["receivedJSON"].get("required_speed_mph", 0)
             # Convert mph to km/h
