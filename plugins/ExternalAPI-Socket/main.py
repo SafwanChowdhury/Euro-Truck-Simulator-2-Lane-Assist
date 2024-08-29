@@ -3,7 +3,6 @@ This is an example of a plugin (type="dynamic"), they will be updated during the
 If you need to make a panel that is only updated when it's open then check the Panel example!
 """
 
-
 from plugins.plugin import PluginInformation
 from src.logger import print
 
@@ -25,6 +24,7 @@ import numpy as np
 import json
 import asyncio
 import uuid
+import time
 
 port = 39846
 
@@ -35,7 +35,7 @@ server = None
 server_task = None
 stop_event = None
 host_id = str(uuid.uuid4())
-
+last_received_time = 0
 
 def convert_ndarrays(obj):
     if isinstance(obj, np.ndarray):
@@ -72,7 +72,7 @@ async def send_data(writer):
         print(f"Error sending data: {e}")
 
 async def receive_data(reader):
-    global stop_event, received_json, other_trucks_data, host_id
+    global stop_event, received_json, other_trucks_data, host_id, last_received_time
     try:
         while not stop_event.is_set():
             data = await reader.readline()
@@ -85,6 +85,7 @@ async def receive_data(reader):
                     # Extract own iteration data
                     if json_data['iteration_data']['host_id'] == host_id:
                         received_json = json_data['iteration_data']
+                        last_received_time = time.time()
                         # Make sure the required speed and override flag are included in received_json
                         if 'required_speed_mph' not in received_json:
                             print("Warning: required_speed_mph not found in iteration_data")
@@ -101,6 +102,12 @@ async def receive_data(reader):
                 print(f"Missing key in JSON data: {e}")
     except Exception as e:
         print(f"Error receiving data: {e}")
+
+def check_connection_timeout():
+    global received_json, last_received_time
+    if time.time() - last_received_time > 5 and received_json:
+        received_json = {}
+        print("Connection timed out. Cleared received_json.")
 
 async def start_server():
     global server, stop_event
@@ -146,6 +153,7 @@ def onDisable():
 
 def plugin(data):
     global currentData, received_json, other_trucks_data, host_id
+    check_connection_timeout()  # Check for connection timeout
     tempData = {
         "api": {
             "truckPlacement": {
@@ -196,8 +204,6 @@ def plugin(data):
     data["externalapi"]["host_id"] = host_id
     return data
 
-    return data
-
 class UI():
     try:
         def __init__(self, master) -> None:
@@ -228,12 +234,12 @@ class UI():
                 return text.isdecimal()
 
             ttk.Label(self.root, text="Send Port").grid(row=1, padx=5, pady=5)
-            self.send_port = tk.IntVar(value=SEND_PORT)
+            self.send_port = tk.IntVar(value=port)
             ttk.Entry(self.root, validate="key", textvariable=self.send_port,
                 validatecommand=(self.root.register(validate_entry), "%S")).grid(row=2, padx=5, pady=5)
 
             ttk.Label(self.root, text="Receive Port").grid(row=3, padx=5, pady=5)
-            self.receive_port = tk.IntVar(value=RECEIVE_PORT)
+            self.receive_port = tk.IntVar(value=port)
             ttk.Entry(self.root, validate="key", textvariable=self.receive_port,
                 validatecommand=(self.root.register(validate_entry), "%S")).grid(row=4, padx=5, pady=5)
 

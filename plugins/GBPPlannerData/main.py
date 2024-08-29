@@ -110,7 +110,7 @@ def plugin(data):
                 velocity_y = mpsToMPH(velocity.get('y', 0))
                 acceleration = mpsToMPH(received_json.get('acceleration', 0))
                 turn_angle = received_json.get('turn_angle', 0)
-                next_speed = mpsToMPH(received_json.get('next_speed', 0))
+                next_speed = received_json.get('next_speed', 0)
 
                 draw_text(frame, "Position X:", 0.1, 0.2, position_x)
                 draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
