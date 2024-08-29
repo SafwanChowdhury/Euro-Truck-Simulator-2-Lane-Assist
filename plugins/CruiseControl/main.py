@@ -97,6 +97,7 @@ def UpdateSettings():
     global last_park_brake
     global turn_was_incoming
     global brakes_switch
+    global override_cruise_control
     
     if "TrafficLightDetection" in settings.GetSettings("Plugins", "Enabled", []):
         trafficlightdetectionisenabled = True
@@ -187,6 +188,9 @@ def UpdateSettings():
     allow_acceleration = True
     pauseresume_allow = True
 
+    override_cruise_control = False
+    
+
 def plugin(data):
     global trafficlightdetectionisenabled
     global navigationdetectionisenabled
@@ -244,6 +248,7 @@ def plugin(data):
     global last_park_brake
     global turn_was_incoming
     global brakes_switch
+    global override_cruise_control
 
     current_time = time.time()
     park_brake_target = False
