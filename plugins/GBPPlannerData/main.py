@@ -13,6 +13,7 @@ import time
 import pyautogui
 import json
 import os
+import csv
 
 PluginInfo = PluginInformation(
     name="GBPPlannerData",
@@ -210,13 +211,15 @@ def plugin(data):
 def export_override_data():
     if override_data:
         timestamp = time.strftime("%Y%m%d-%H%M%S")
-        filename = f"override_data_{timestamp}.txt"
+        filename = f"override_data_{timestamp}.csv"
         filepath = os.path.join(variables.PATH, "exports", filename)
         
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
-        with open(filepath, 'w') as f:
-            json.dump(override_data, f, indent=2)
+        with open(filepath, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=['timestamp', 'next_speed', 'distance', 'truck_id'])
+            writer.writeheader()
+            writer.writerows(override_data)
         
         print(f"Override data exported to {filepath}")
 
