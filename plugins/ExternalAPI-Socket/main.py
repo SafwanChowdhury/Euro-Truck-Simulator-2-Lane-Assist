@@ -99,7 +99,8 @@ async def receive_data(reader):
                             if len(latencies) > 100:  # Keep only the last 100 latencies
                                 latencies.pop(0)
                             avg_latency = sum(latencies) / len(latencies)
-                            print(f"Current latency: {latency:.3f}s, Average latency: {avg_latency:.3f}s")
+                            received_json['latency'] = avg_latency
+                            # print(f"Current latency: {latency:.3f}s, Average latency: {avg_latency:.3f}s")
                     
                     # Extract data of other trucks
                     other_trucks_data = [truck for truck in json_data['all_trucks_data'] if truck['host_id'] != host_id]

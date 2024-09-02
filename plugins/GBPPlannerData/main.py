@@ -115,6 +115,7 @@ def plugin(data):
         host_id = data["last"]["externalapi"].get("host_id")
         robot_id = data["last"]["externalapi"]["receivedJSON"].get("robot_id")
         timestep = data["last"]["externalapi"]["receivedJSON"].get("timestep")
+        latency = data["last"]["externalapi"]["receivedJSON"].get("latency")
         # Ensure received_json is not None and is a dictionary
         if received_json and isinstance(received_json, dict):
             # Check if the host_id matches
@@ -141,7 +142,8 @@ def plugin(data):
                             override_data.append({
                                 'timestamp': timestep,
                                 'next_speed': next_speed,
-                                'distance': distance
+                                'distance': distance,
+                                'latency': latency
                             })
                 
                 if not override_cruise_control and last_override_state:
@@ -155,6 +157,7 @@ def plugin(data):
                 draw_text(frame, "Acceleration (mph/s):", 0.1, 0.4, acceleration)
                 draw_text(frame, "Next Speed (mph):", 0.1, 0.5, next_speed)
                 draw_text(frame, "Override Cruise Control:", 0.1, 0.6, override_cruise_control)
+                draw_text(frame, "Latency:", 0.1, 0.7, latency)
             else:
                 cv2.putText(frame, "Received data is not for this host", (int(0.1*width_frame), int(0.5*height_frame)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
@@ -162,7 +165,7 @@ def plugin(data):
             # Display other trucks' data
             other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
             num_trucks = len(other_trucks_data)
-            y_offset = 0.8 if num_trucks == 0 else 0.7
+            y_offset = 0.9 if num_trucks == 0 else 0.8
 
             # Get the current truck's position
             current_x = position_x
@@ -218,7 +221,7 @@ def export_override_data():
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
         with open(filepath, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=['timestamp', 'next_speed', 'distance'])
+            writer = csv.DictWriter(f, fieldnames=['timestamp', 'next_speed', 'distance', 'latency'])
             writer.writeheader()
             writer.writerows(override_data)
         
