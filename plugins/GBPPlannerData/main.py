@@ -11,6 +11,8 @@ import src.variables as variables
 from src.translator import Translate
 import time
 import pyautogui
+import json
+import os
 
 PluginInfo = PluginInformation(
     name="GBPPlannerData",
@@ -34,6 +36,8 @@ height_frame = settings.GetSettings("GBPPlannerData", "height_frame", round(heig
 last_width_frame = width_frame
 last_height_frame = height_frame
 frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
+override_data = []
+last_override_state = False
 
 def LoadSettings():
     global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
@@ -85,7 +89,7 @@ def mpsToMPH(speed):
     return speed * 2.23694  # Convert m/s to mph
 
 def plugin(data):
-    global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
+    global width_frame, height_frame, last_width_frame, last_height_frame, frame_original, override_data, last_override_state
 
     try:
         size_frame = cv2.getWindowImageRect(name_window)
@@ -119,6 +123,30 @@ def plugin(data):
                 acceleration = mpsToMPH(received_json.get('acceleration', 0))
                 next_speed = received_json.get('next_speed', 0)
                 override_cruise_control = received_json.get('override_cruise_control', False)
+
+                # Handle override data collection and export
+                if override_cruise_control and not last_override_state:
+                    override_data = []  # Reset data when override starts
+                
+                if override_cruise_control:
+                    other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
+                    for truck in other_trucks_data:
+                        if truck.get('robot_id') != robot_id and truck.get('robot_id') is not None:
+                            truck_position = truck.get('position', {})
+                            truck_x = truck_position.get('x', 0)
+                            truck_y = truck_position.get('y', 0)
+                            distance = ((truck_x - position_x)**2 + (truck_y - position_y)**2)**0.5
+                            override_data.append({
+                                'timestamp': time.time(),
+                                'next_speed': next_speed,
+                                'distance': distance,
+                                'truck_id': truck.get('robot_id')
+                            })
+                
+                if not override_cruise_control and last_override_state:
+                    export_override_data()
+
+                last_override_state = override_cruise_control
 
                 draw_text(frame, "Position X:", 0.1, 0.2, position_x)
                 draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
@@ -179,6 +207,18 @@ def plugin(data):
 
     return data
 
+def export_override_data():
+    if override_data:
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        filename = f"override_data_{timestamp}.txt"
+        filepath = os.path.join(variables.PATH, "exports", filename)
+        
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        
+        with open(filepath, 'w') as f:
+            json.dump(override_data, f, indent=2)
+        
+        print(f"Override data exported to {filepath}")
 
 def onEnable():
     LoadSettings()
