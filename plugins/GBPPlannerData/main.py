@@ -45,7 +45,9 @@ def LoadSettings():
 
 def draw_text(frame, label, x_pos, y_pos, value):
     current_text = f"{label} {value:.2f}"
-    fontscale = 1
+    max_width = int(frame.shape[1] * 0.9)  # 90% of frame width
+    max_height = int(frame.shape[0] * 0.1)  # 10% of frame height
+    fontscale = get_optimal_font_scale(current_text, max_width, max_height)
     thickness = 2
 
     textsize, _ = cv2.getTextSize(current_text, cv2.FONT_HERSHEY_SIMPLEX, fontscale, thickness)
@@ -53,6 +55,16 @@ def draw_text(frame, label, x_pos, y_pos, value):
 
     cv2.putText(frame, current_text, (round(x_pos * frame.shape[1]), round(y_pos * frame.shape[0] + height / 2)),
                 cv2.FONT_HERSHEY_SIMPLEX, fontscale, text_color, thickness)
+
+def get_optimal_font_scale(text, max_width, max_height):
+    fontScale = 1
+    thickness = 2
+    while True:
+        textSize = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, fontScale, thickness)[0]
+        if textSize[0] > max_width or textSize[1] > max_height:
+            fontScale -= 0.1
+        else:
+            return fontScale
 
 def handle_window_properties(window_name):
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -119,8 +131,9 @@ def plugin(data):
             
             # Display other trucks' data
             other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
-            y_offset = 0.7  # Starting Y position offset for displaying other trucks data
-            
+            num_trucks = len(other_trucks_data)
+            y_offset = 0.7 if num_trucks == 0 else 0.6
+
             # Get the current truck's position
             current_position = received_json.get('position', {})
             current_x = current_position.get('x', 0)
@@ -136,19 +149,23 @@ def plugin(data):
                 # Calculate the distance between the current truck and this truck
                 distance = ((truck_x - current_x)**2 + (truck_y - current_y)**2)**0.5
 
-                draw_text(frame, f"Truck ID {truck_id} - Distance:", 0.1, y_offset, f"{distance:.2f}")
-                y_offset += 0.1
+                draw_text(frame, f"Truck ID {truck_id} - Distance:", 0.1, y_offset, distance)
+                y_offset += min(0.1, 0.3 / max(1, num_trucks))  # Adjust spacing based on number of trucks
                 
-                # Adjust the offset if needed to avoid overlapping with other information
-                if y_offset > 0.9:
-                    y_offset = 0.1
+                # Remove the following lines as we don't need them anymore
+                # if y_offset > 0.9:
+                #     y_offset = 0.1
             
         else:
             cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
     else:
-        cv2.putText(frame, "Waiting for GBPPlanner data...", (int(0.1*width_frame), int(0.5*height_frame)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+        max_width = int(frame.shape[1] * 0.9)
+        max_height = int(frame.shape[0] * 0.1)
+        waiting_text = "Waiting for GBPPlanner data..."
+        fontscale = get_optimal_font_scale(waiting_text, max_width, max_height)
+        cv2.putText(frame, waiting_text, (int(0.1*width_frame), int(0.5*height_frame)),
+                    cv2.FONT_HERSHEY_SIMPLEX, fontscale, text_color, 2)
 
     cv2.imshow(name_window, frame)
 
@@ -188,40 +205,10 @@ class UI():
         helpers.MakeLabel(self.frame, "GBPPlanner Data Settings", 0, 0, font=("Robot", 12, "bold"), columnspan=3)
         helpers.MakeEmptyLine(self.frame, 1, 0)
 
-        # Add window size adjustment settings
-        helpers.MakeLabel(self.frame, "Window Width:", 2, 0)
-        self.width_entry = helpers.MakeEntry(self.frame, 2, 1, width=10)
-        self.width_entry.insert(0, str(width_frame))
-
-        helpers.MakeLabel(self.frame, "Window Height:", 3, 0)
-        self.height_entry = helpers.MakeEntry(self.frame, 3, 1, width=10)
-        self.height_entry.insert(0, str(height_frame))
-
-        ttk.Button(self.frame, text="Apply", command=self.apply_settings).grid(row=4, column=0, columnspan=2, pady=10)
-
         ttk.Button(self.root, text="Save", command=self.save).pack(anchor="center", pady=6)
-
-    def apply_settings(self):
-        global width_frame, height_frame, frame_original
-        try:
-            new_width = int(self.width_entry.get())
-            new_height = int(self.height_entry.get())
-            if new_width >= 50 and new_height >= 50:
-                width_frame = new_width
-                height_frame = new_height
-                frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
-                cv2.resizeWindow(name_window, width_frame, height_frame)
-                settings.CreateSettings("GBPPlannerData", "width_frame", width_frame)
-                settings.CreateSettings("GBPPlannerData", "height_frame", height_frame)
-                tk.messagebox.showinfo("Settings Applied", "Window size settings have been applied.")
-            else:
-                tk.messagebox.showerror("Invalid Input", "Width and height must be at least 50 pixels.")
-        except ValueError:
-            tk.messagebox.showerror("Invalid Input", "Please enter valid numbers for width and height.")
 
     def save(self):
         LoadSettings()
-        tk.messagebox.showinfo("Settings Saved", "Settings have been saved and reloaded.")
 
     def tabFocused(self):
         pass
