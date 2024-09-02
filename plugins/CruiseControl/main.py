@@ -272,7 +272,6 @@ def plugin(data):
         if override_cruise_control:
             required_speed_mph = data["last"]["externalapi"]["receivedJSON"]["next_speed"]
             # Convert mph to km/h
-            print("Required speed: " + str(required_speed_mph))
             required_speed_kmh = required_speed_mph * 1.60934
             if required_speed_kmh < 0:
                 required_speed_kmh = 0
@@ -461,12 +460,10 @@ def plugin(data):
                     trafficlight_allow_acceleration = False
                 if cruisecontrolspeed != 0 and cruisecontrolspeed < targetspeed and wait_for_response == False and targetspeed != 0:
                     data["sdk"]["CruiseControlIncrease"] = True
-                    print("Increase -> Target speed: " + str(targetspeed) + "Cruise control speed: " + str(cruisecontrolspeed))
                     wait_for_response = True
                     wait_for_response_timer = current_time
                 if cruisecontrolspeed != 0 and cruisecontrolspeed > targetspeed and wait_for_response == False and targetspeed != 0:
                     data["sdk"]["CruiseControlDecrease"] = True
-                    print("Decrease -> Target speed: " + str(targetspeed) + "Cruise control speed: " + str(cruisecontrolspeed))
                     wait_for_response = True
                     wait_for_response_timer = current_time
             else:
@@ -478,12 +475,10 @@ def plugin(data):
                     trafficlight_allow_acceleration = False
                 if cruisecontrolspeed != 0 and cruisecontrolspeed < targetspeed and wait_for_response == False and targetspeed != 0:
                     data["sdk"]["CruiseControlIncrease"] = True
-                    print("Increase -> Target speed: " + str(targetspeed) + "Cruise control speed: " + str(cruisecontrolspeed))
                     wait_for_response = True
                     wait_for_response_timer = current_time
                 if cruisecontrolspeed != 0 and cruisecontrolspeed > targetspeed and wait_for_response == False and targetspeed != 0:
                     data["sdk"]["CruiseControlDecrease"] = True
-                    print("Decrease -> Target speed: " + str(targetspeed) + "Cruise control speed: " + str(cruisecontrolspeed))
                     wait_for_response = True
                     wait_for_response_timer = current_time
                 if speed < 30 and cruisecontrolspeed == 0 and targetspeed != 0 and trafficlight_accelerate == True and trafficlight_allow_acceleration == True and user_emergency_braking == False and do_lanedetected_stop == False:

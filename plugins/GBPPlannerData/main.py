@@ -145,6 +145,7 @@ def plugin(data):
                             })
                 
                 if not override_cruise_control and last_override_state:
+                    print("Exporting override data")
                     export_override_data()
 
                 last_override_state = override_cruise_control
