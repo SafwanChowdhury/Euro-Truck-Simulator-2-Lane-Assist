@@ -115,9 +115,9 @@ def plugin(data):
 
                 draw_text(frame, "Position X:", 0.1, 0.2, position_x)
                 draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
-                draw_text(frame, "Acceleration (mph/s):", 0.1, 0.6, acceleration)
-                draw_text(frame, "Next Speed (mph):", 0.1, 0.8, next_speed)
-                draw_text(frame, "Override Cruise Control:", 0.1, 1.0, override_cruise_control)
+                draw_text(frame, "Acceleration (mph/s):", 0.1, 0.4, acceleration)
+                draw_text(frame, "Next Speed (mph):", 0.1, 0.5, next_speed)
+                draw_text(frame, "Override Cruise Control:", 0.1, 0.6, override_cruise_control)
             else:
                 cv2.putText(frame, "Received data is not for this host", (int(0.1*width_frame), int(0.5*height_frame)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
