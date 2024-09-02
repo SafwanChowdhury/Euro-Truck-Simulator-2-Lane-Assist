@@ -102,14 +102,9 @@ def plugin(data):
             # Check if the host_id matches
             if received_json.get('host_id') == host_id:
                 position = received_json.get('position', {})
-                velocity = received_json.get('velocity', {})
-                
                 position_x = position.get('x', 0)
                 position_y = position.get('y', 0)
-                velocity_x = mpsToMPH(velocity.get('x', 0))
-                velocity_y = mpsToMPH(velocity.get('y', 0))
                 acceleration = mpsToMPH(received_json.get('acceleration', 0))
-                turn_angle = received_json.get('turn_angle', 0)
                 next_speed = received_json.get('next_speed', 0)
                 override_cruise_control = received_json.get('override_cruise_control', False)
 
@@ -124,30 +119,29 @@ def plugin(data):
             
             # Display other trucks' data
             other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
-            y_offset = 0.9  # Starting Y position offset for displaying other trucks data
+            y_offset = 0.7  # Starting Y position offset for displaying other trucks data
             
-            # for truck in other_trucks_data:
-            #     truck_id = truck.get('robot_id')
-            #     position = truck.get('position', {})
-            #     velocity = truck.get('velocity', {})
-                
-            #     position_x = position.get('x', 0)
-            #     position_y = position.get('y', 0)
-            #     velocity_x = mpsToMPH(velocity.get('x', 0))
-            #     velocity_y = mpsToMPH(velocity.get('y', 0))
+            # Get the current truck's position
+            current_position = received_json.get('position', {})
+            current_x = current_position.get('x', 0)
+            current_y = current_position.get('y', 0)
 
-            #     draw_text(frame, f"Truck ID {truck_id} - Pos X:", 0.1, y_offset, position_x)
-            #     y_offset += 0.1
-            #     draw_text(frame, f"Truck ID {truck_id} - Pos Y:", 0.1, y_offset, position_y)
-            #     y_offset += 0.1
-            #     draw_text(frame, f"Truck ID {truck_id} - Vel X (mph):", 0.1, y_offset, velocity_x)
-            #     y_offset += 0.1
-            #     draw_text(frame, f"Truck ID {truck_id} - Vel Y (mph):", 0.1, y_offset, velocity_y)
-            #     y_offset += 0.1
+            for truck in other_trucks_data:
+                truck_id = truck.get('robot_id')
+                position = truck.get('position', {})
                 
-            #     # Adjust the offset if needed to avoid overlapping with other information
-            #     if y_offset > 0.9:
-            #         y_offset = 0.1
+                truck_x = position.get('x', 0)
+                truck_y = position.get('y', 0)
+
+                # Calculate the distance between the current truck and this truck
+                distance = ((truck_x - current_x)**2 + (truck_y - current_y)**2)**0.5
+
+                draw_text(frame, f"Truck ID {truck_id} - Distance:", 0.1, y_offset, f"{distance:.2f}")
+                y_offset += 0.1
+                
+                # Adjust the offset if needed to avoid overlapping with other information
+                if y_offset > 0.9:
+                    y_offset = 0.1
             
         else:
             cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
@@ -194,10 +188,40 @@ class UI():
         helpers.MakeLabel(self.frame, "GBPPlanner Data Settings", 0, 0, font=("Robot", 12, "bold"), columnspan=3)
         helpers.MakeEmptyLine(self.frame, 1, 0)
 
+        # Add window size adjustment settings
+        helpers.MakeLabel(self.frame, "Window Width:", 2, 0)
+        self.width_entry = helpers.MakeEntry(self.frame, 2, 1, width=10)
+        self.width_entry.insert(0, str(width_frame))
+
+        helpers.MakeLabel(self.frame, "Window Height:", 3, 0)
+        self.height_entry = helpers.MakeEntry(self.frame, 3, 1, width=10)
+        self.height_entry.insert(0, str(height_frame))
+
+        ttk.Button(self.frame, text="Apply", command=self.apply_settings).grid(row=4, column=0, columnspan=2, pady=10)
+
         ttk.Button(self.root, text="Save", command=self.save).pack(anchor="center", pady=6)
+
+    def apply_settings(self):
+        global width_frame, height_frame, frame_original
+        try:
+            new_width = int(self.width_entry.get())
+            new_height = int(self.height_entry.get())
+            if new_width >= 50 and new_height >= 50:
+                width_frame = new_width
+                height_frame = new_height
+                frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
+                cv2.resizeWindow(name_window, width_frame, height_frame)
+                settings.CreateSettings("GBPPlannerData", "width_frame", width_frame)
+                settings.CreateSettings("GBPPlannerData", "height_frame", height_frame)
+                tk.messagebox.showinfo("Settings Applied", "Window size settings have been applied.")
+            else:
+                tk.messagebox.showerror("Invalid Input", "Width and height must be at least 50 pixels.")
+        except ValueError:
+            tk.messagebox.showerror("Invalid Input", "Please enter valid numbers for width and height.")
 
     def save(self):
         LoadSettings()
+        tk.messagebox.showinfo("Settings Saved", "Settings have been saved and reloaded.")
 
     def tabFocused(self):
         pass
