@@ -126,28 +126,28 @@ def plugin(data):
             other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
             y_offset = 0.9  # Starting Y position offset for displaying other trucks data
             
-            for truck in other_trucks_data:
-                truck_id = truck.get('robot_id')
-                position = truck.get('position', {})
-                velocity = truck.get('velocity', {})
+            # for truck in other_trucks_data:
+            #     truck_id = truck.get('robot_id')
+            #     position = truck.get('position', {})
+            #     velocity = truck.get('velocity', {})
                 
-                position_x = position.get('x', 0)
-                position_y = position.get('y', 0)
-                velocity_x = mpsToMPH(velocity.get('x', 0))
-                velocity_y = mpsToMPH(velocity.get('y', 0))
+            #     position_x = position.get('x', 0)
+            #     position_y = position.get('y', 0)
+            #     velocity_x = mpsToMPH(velocity.get('x', 0))
+            #     velocity_y = mpsToMPH(velocity.get('y', 0))
 
-                draw_text(frame, f"Truck ID {truck_id} - Pos X:", 0.1, y_offset, position_x)
-                y_offset += 0.1
-                draw_text(frame, f"Truck ID {truck_id} - Pos Y:", 0.1, y_offset, position_y)
-                y_offset += 0.1
-                draw_text(frame, f"Truck ID {truck_id} - Vel X (mph):", 0.1, y_offset, velocity_x)
-                y_offset += 0.1
-                draw_text(frame, f"Truck ID {truck_id} - Vel Y (mph):", 0.1, y_offset, velocity_y)
-                y_offset += 0.1
+            #     draw_text(frame, f"Truck ID {truck_id} - Pos X:", 0.1, y_offset, position_x)
+            #     y_offset += 0.1
+            #     draw_text(frame, f"Truck ID {truck_id} - Pos Y:", 0.1, y_offset, position_y)
+            #     y_offset += 0.1
+            #     draw_text(frame, f"Truck ID {truck_id} - Vel X (mph):", 0.1, y_offset, velocity_x)
+            #     y_offset += 0.1
+            #     draw_text(frame, f"Truck ID {truck_id} - Vel Y (mph):", 0.1, y_offset, velocity_y)
+            #     y_offset += 0.1
                 
-                # Adjust the offset if needed to avoid overlapping with other information
-                if y_offset > 0.9:
-                    y_offset = 0.1
+            #     # Adjust the offset if needed to avoid overlapping with other information
+            #     if y_offset > 0.9:
+            #         y_offset = 0.1
             
         else:
             cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
