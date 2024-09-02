@@ -141,7 +141,7 @@ def plugin(data):
             for truck in other_trucks_data:
                 truck_id = truck.get('robot_id')
                 # Make sure we're not displaying our own truck's data
-                if truck_id != robot_id:
+                if truck_id != robot_id and truck_id != None:
                     position = truck.get('position', {})
                     
                     truck_x = position.get('x', 0)
