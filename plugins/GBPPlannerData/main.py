@@ -135,8 +135,8 @@ def plugin(data):
             y_offset = 0.8 if num_trucks == 0 else 0.7
 
             # Get the current truck's position
-            current_x = data["api"]["truckPlacement"].get("coordinateX", 0.0)
-            current_y = data["api"]["truckPlacement"].get("coordinateZ", 0.0)
+            current_x = position_x
+            current_y = position_y
 
             for truck in other_trucks_data:
                 truck_id = truck.get('robot_id')
