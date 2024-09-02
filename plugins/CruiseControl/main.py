@@ -276,8 +276,8 @@ def plugin(data):
             if required_speed_kmh < 0:
                 required_speed_kmh = 0
             
-            if required_speed_kmh > speedlimit + 10:
-                required_speed_kmh = speedlimit + 10
+            # if required_speed_kmh > speedlimit + 10:
+            #     required_speed_kmh = speedlimit + 10
 
             if required_speed_kmh < 40:
                 required_speed_kmh = 40
