@@ -108,7 +108,7 @@ def plugin(data):
     if "last" in data and "externalapi" in data["last"] and "receivedJSON" in data["last"]["externalapi"]:
         received_json = data["last"]["externalapi"]["receivedJSON"]
         host_id = data["last"]["externalapi"].get("host_id")
-        
+        robot_id = data["last"]["externalapi"]["receivedJSON"].get("robot_id")
         # Ensure received_json is not None and is a dictionary
         if received_json and isinstance(received_json, dict):
             # Check if the host_id matches
@@ -135,22 +135,23 @@ def plugin(data):
             y_offset = 0.8 if num_trucks == 0 else 0.7
 
             # Get the current truck's position
-            current_position = received_json.get('position', {})
-            current_x = current_position.get('x', 0)
-            current_y = current_position.get('y', 0)
+            current_x = data["api"]["truckPlacement"].get("coordinateX", 0.0)
+            current_y = data["api"]["truckPlacement"].get("coordinateZ", 0.0)
 
             for truck in other_trucks_data:
                 truck_id = truck.get('robot_id')
-                position = truck.get('position', {})
-                
-                truck_x = position.get('x', 0)
-                truck_y = position.get('y', 0)
+                # Make sure we're not displaying our own truck's data
+                if truck_id != robot_id:
+                    position = truck.get('position', {})
+                    
+                    truck_x = position.get('x', 0)
+                    truck_y = position.get('y', 0)
 
-                # Calculate the distance between the current truck and this truck
-                distance = ((truck_x - current_x)**2 + (truck_y - current_y)**2)**0.5
+                    # Calculate the distance between the current truck and this truck
+                    distance = ((truck_x - current_x)**2 + (truck_y - current_y)**2)**0.5
 
-                draw_text(frame, f"Truck ID {truck_id} - Distance:", 0.1, y_offset, distance)
-                y_offset += min(0.1, 0.3 / max(1, num_trucks))  # Adjust spacing based on number of trucks
+                    draw_text(frame, f"Truck ID {truck_id} - Distance:", 0.1, y_offset, distance)
+                    y_offset += min(0.1, 0.3 / max(1, num_trucks))  # Adjust spacing based on number of trucks
             
         else:
             cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
