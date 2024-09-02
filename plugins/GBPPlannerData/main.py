@@ -132,7 +132,7 @@ def plugin(data):
             # Display other trucks' data
             other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
             num_trucks = len(other_trucks_data)
-            y_offset = 0.7 if num_trucks == 0 else 0.6
+            y_offset = 0.8 if num_trucks == 0 else 0.7
 
             # Get the current truck's position
             current_position = received_json.get('position', {})
@@ -151,10 +151,6 @@ def plugin(data):
 
                 draw_text(frame, f"Truck ID {truck_id} - Distance:", 0.1, y_offset, distance)
                 y_offset += min(0.1, 0.3 / max(1, num_trucks))  # Adjust spacing based on number of trucks
-                
-                # Remove the following lines as we don't need them anymore
-                # if y_offset > 0.9:
-                #     y_offset = 0.1
             
         else:
             cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
