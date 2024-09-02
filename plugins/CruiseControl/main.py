@@ -330,13 +330,14 @@ def plugin(data):
         park_brake = False
         gamepaused = False
 
-    if override_cruise_control == False and speedlimit != 0 and speedlimit > 0:
-        targetspeed = speedlimit
-    else:
-        if override_cruise_control == False and last_speedlimit != 0 and last_speedlimit > 0:
-            targetspeed = last_speedlimit
+    if not override_cruise_control:
+        if speedlimit != 0 and speedlimit > 0:
+            targetspeed = speedlimit
         else:
-            targetspeed = 30
+            if last_speedlimit != 0 and last_speedlimit > 0:
+                targetspeed = last_speedlimit
+            else:
+                targetspeed = 30
     
     if trafficlightdetectionisenabled == True:
         try:
