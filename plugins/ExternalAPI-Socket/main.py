@@ -36,6 +36,8 @@ server_task = None
 stop_event = None
 host_id = str(uuid.uuid4())
 last_received_time = 0
+last_sent_time = 0
+latencies = []
 
 def convert_ndarrays(obj):
     if isinstance(obj, np.ndarray):
@@ -61,18 +63,19 @@ async def handle_client(reader, writer):
         await writer.wait_closed()
 
 async def send_data(writer):
-    global currentData, stop_event, host_id
+    global currentData, stop_event, host_id, last_sent_time
     try:
         while not stop_event.is_set():
-            message = json.dumps({**currentData, "host_id": host_id})
+            message = json.dumps({**currentData, "host_id": host_id, "sent_time": time.time()})
             writer.write(message.encode() + b'\n')
             await writer.drain()
+            last_sent_time = time.time()  # Record the time when data was sent
             await asyncio.sleep(0.033)  # 30 FPS
     except Exception as e:
         print(f"Error sending data: {e}")
 
 async def receive_data(reader):
-    global stop_event, received_json, other_trucks_data, host_id, last_received_time
+    global stop_event, received_json, other_trucks_data, host_id, last_received_time, latencies
     try:
         while not stop_event.is_set():
             data = await reader.readline()
@@ -86,11 +89,17 @@ async def receive_data(reader):
                     if json_data['iteration_data']['host_id'] == host_id:
                         received_json = json_data['iteration_data']
                         last_received_time = time.time()
-                        # Make sure the required speed and override flag are included in received_json
-                        if 'required_speed_mph' not in received_json:
-                            print("Warning: required_speed_mph not found in iteration_data")
+                        if 'timestep' not in received_json:
+                            print("Warning: timestep not found in iteration_data")
                         if 'override_cruise_control' not in received_json:
                             print("Warning: override_cruise_control not found in iteration_data")
+                        if 'sent_time' in received_json:
+                            latency = last_received_time - float(received_json['sent_time'])
+                            latencies.append(latency)
+                            if len(latencies) > 100:  # Keep only the last 100 latencies
+                                latencies.pop(0)
+                            avg_latency = sum(latencies) / len(latencies)
+                            print(f"Current latency: {latency:.3f}s, Average latency: {avg_latency:.3f}s")
                     
                     # Extract data of other trucks
                     other_trucks_data = [truck for truck in json_data['all_trucks_data'] if truck['host_id'] != host_id]

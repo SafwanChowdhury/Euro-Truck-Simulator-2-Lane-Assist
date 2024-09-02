@@ -114,6 +114,7 @@ def plugin(data):
         received_json = data["last"]["externalapi"]["receivedJSON"]
         host_id = data["last"]["externalapi"].get("host_id")
         robot_id = data["last"]["externalapi"]["receivedJSON"].get("robot_id")
+        timestep = data["last"]["externalapi"]["receivedJSON"].get("timestep")
         # Ensure received_json is not None and is a dictionary
         if received_json and isinstance(received_json, dict):
             # Check if the host_id matches
@@ -138,7 +139,7 @@ def plugin(data):
                             truck_y = truck_position.get('y', 0)
                             distance = ((truck_x - position_x)**2 + (truck_y - position_y)**2)**0.5
                             override_data.append({
-                                'timestamp': time.time(),
+                                'timestamp': timestep,
                                 'next_speed': next_speed,
                                 'distance': distance
                             })
