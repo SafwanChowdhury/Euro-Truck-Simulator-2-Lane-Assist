@@ -39,6 +39,7 @@ last_height_frame = height_frame
 frame_original = np.zeros((height_frame, width_frame, 3), dtype=np.uint8)
 override_data = []
 last_override_state = False
+is_receiving_data = False
 
 def LoadSettings():
     global width_frame, height_frame, last_width_frame, last_height_frame, frame_original
@@ -90,7 +91,7 @@ def mpsToMPH(speed):
     return speed * 2.23694  # Convert m/s to mph
 
 def plugin(data):
-    global width_frame, height_frame, last_width_frame, last_height_frame, frame_original, override_data, last_override_state
+    global width_frame, height_frame, last_width_frame, last_height_frame, frame_original, override_data, last_override_state, is_receiving_data
 
     try:
         size_frame = cv2.getWindowImageRect(name_window)
@@ -116,80 +117,93 @@ def plugin(data):
         robot_id = data["last"]["externalapi"]["receivedJSON"].get("robot_id")
         timestep = data["last"]["externalapi"]["receivedJSON"].get("timestep")
         latency = data["last"]["externalapi"]["receivedJSON"].get("latency")
-        # Ensure received_json is not None and is a dictionary
-        if received_json and isinstance(received_json, dict):
-            # Check if the host_id matches
-            if received_json.get('host_id') == host_id:
-                position = received_json.get('position', {})
-                position_x = position.get('x', 0)
-                position_y = position.get('y', 0)
-                acceleration = mpsToMPH(received_json.get('acceleration', 0))
-                next_speed = received_json.get('next_speed', 0)
-                override_cruise_control = received_json.get('override_cruise_control', False)
+        
+        if received_json:
+            is_receiving_data = True
+            # Ensure received_json is not None and is a dictionary
+            if isinstance(received_json, dict):
+                # Check if the host_id matches
+                if received_json.get('host_id') == host_id:
+                    position = received_json.get('position', {})
+                    position_x = position.get('x', 0)
+                    position_y = position.get('y', 0)
+                    acceleration = mpsToMPH(received_json.get('acceleration', 0))
+                    next_speed = received_json.get('next_speed', 0)
+                    override_cruise_control = received_json.get('override_cruise_control', False)
 
-                # Handle override data collection and export
-                if override_cruise_control and not last_override_state:
-                    override_data = []  # Reset data when override starts
+                    # Handle override data collection and export
+                    if override_cruise_control and not last_override_state:
+                        override_data = []  # Reset data when override starts
                 
-                if override_cruise_control:
-                    other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
-                    for truck in other_trucks_data:
-                        if truck.get('robot_id') != robot_id and truck.get('robot_id') is not None:
-                            truck_position = truck.get('position', {})
-                            truck_x = truck_position.get('x', 0)
-                            truck_y = truck_position.get('y', 0)
-                            distance = ((truck_x - position_x)**2 + (truck_y - position_y)**2)**0.5
-                            override_data.append({
-                                'timestamp': timestep,
-                                'next_speed': next_speed,
-                                'distance': distance,
-                                'latency': latency
-                            })
+                    if override_cruise_control:
+                        other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
+                        for truck in other_trucks_data:
+                            if truck.get('robot_id') != robot_id and truck.get('robot_id') is not None:
+                                truck_position = truck.get('position', {})
+                                truck_x = truck_position.get('x', 0)
+                                truck_y = truck_position.get('y', 0)
+                                distance = ((truck_x - position_x)**2 + (truck_y - position_y)**2)**0.5
+                                override_data.append({
+                                    'timestamp': timestep,
+                                    'next_speed': next_speed,
+                                    'distance': distance,
+                                    'latency': latency
+                                })
                 
-                if not override_cruise_control and last_override_state:
-                    print("Exporting override data")
-                    export_override_data()
+                    if not override_cruise_control and last_override_state:
+                        print("Exporting override data")
+                        export_override_data()
 
-                last_override_state = override_cruise_control
+                    last_override_state = override_cruise_control
 
-                draw_text(frame, "Position X:", 0.1, 0.2, position_x)
-                draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
-                draw_text(frame, "Acceleration (mph/s):", 0.1, 0.4, acceleration)
-                draw_text(frame, "Next Speed (mph):", 0.1, 0.5, next_speed)
-                draw_text(frame, "Override Cruise Control:", 0.1, 0.6, override_cruise_control)
-                draw_text(frame, "Latency:", 0.1, 0.7, latency)
+                    draw_text(frame, "Position X:", 0.1, 0.2, position_x)
+                    draw_text(frame, "Position Y:", 0.1, 0.3, position_y)
+                    draw_text(frame, "Acceleration (mph/s):", 0.1, 0.4, acceleration)
+                    draw_text(frame, "Next Speed (mph):", 0.1, 0.5, next_speed)
+                    draw_text(frame, "Override Cruise Control:", 0.1, 0.6, override_cruise_control)
+                    draw_text(frame, "Latency:", 0.1, 0.7, latency)
+                else:
+                    cv2.putText(frame, "Received data is not for this host", (int(0.1*width_frame), int(0.5*height_frame)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+            
+                # Display other trucks' data
+                other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
+                num_trucks = len(other_trucks_data)
+                y_offset = 0.9 if num_trucks == 0 else 0.8
+
+                # Get the current truck's position
+                current_x = position_x
+                current_y = position_y
+
+                for truck in other_trucks_data:
+                    truck_id = truck.get('robot_id')
+                    # Make sure we're not displaying our own truck's data
+                    if truck_id != robot_id and truck_id != None:
+                        position = truck.get('position', {})
+                        
+                        truck_x = position.get('x', 0)
+                        truck_y = position.get('y', 0)
+
+                        # Calculate the distance between the current truck and this truck
+                        distance = ((truck_x - current_x)**2 + (truck_y - current_y)**2)**0.5
+
+                        draw_text(frame, f"Truck ID {truck_id} - Distance:", 0.1, y_offset, distance)
+                        y_offset += min(0.1, 0.3 / max(1, num_trucks))  # Adjust spacing based on number of trucks
+            
             else:
-                cv2.putText(frame, "Received data is not for this host", (int(0.1*width_frame), int(0.5*height_frame)),
+                cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
-            
-            # Display other trucks' data
-            other_trucks_data = data["last"]["externalapi"].get("otherTrucksData", [])
-            num_trucks = len(other_trucks_data)
-            y_offset = 0.9 if num_trucks == 0 else 0.8
-
-            # Get the current truck's position
-            current_x = position_x
-            current_y = position_y
-
-            for truck in other_trucks_data:
-                truck_id = truck.get('robot_id')
-                # Make sure we're not displaying our own truck's data
-                if truck_id != robot_id and truck_id != None:
-                    position = truck.get('position', {})
-                    
-                    truck_x = position.get('x', 0)
-                    truck_y = position.get('y', 0)
-
-                    # Calculate the distance between the current truck and this truck
-                    distance = ((truck_x - current_x)**2 + (truck_y - current_y)**2)**0.5
-
-                    draw_text(frame, f"Truck ID {truck_id} - Distance:", 0.1, y_offset, distance)
-                    y_offset += min(0.1, 0.3 / max(1, num_trucks))  # Adjust spacing based on number of trucks
-            
         else:
-            cv2.putText(frame, "Received data is not in the expected format", (int(0.1*width_frame), int(0.5*height_frame)),
+            if is_receiving_data:
+                # We were receiving data, but now it's empty, so export
+                export_override_data()
+                cv2.putText(frame, "Data stream ended, exporting override data", (int(0.1*width_frame), int(0.5*height_frame)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+            is_receiving_data = False
+            cv2.putText(frame, "Received data is empty", (int(0.1*width_frame), int(0.6*height_frame)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
     else:
+        is_receiving_data = False
         max_width = int(frame.shape[1] * 0.9)
         max_height = int(frame.shape[0] * 0.1)
         waiting_text = "Waiting for GBPPlanner data..."
@@ -213,6 +227,7 @@ def plugin(data):
     return data
 
 def export_override_data():
+    global override_data
     if override_data:
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         filename = f"override_data_{timestamp}.csv"
@@ -221,11 +236,14 @@ def export_override_data():
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
         with open(filepath, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=['timestamp', 'next_speed', 'distance', 'latency'])
+            writer = csv.DictWriter(f, fieldnames=['timestep', 'next_speed', 'distance', 'latency'])
             writer.writeheader()
             writer.writerows(override_data)
         
         print(f"Override data exported to {filepath}")
+        override_data = []  # Clear the data after exporting
+    else:
+        print("No override data to export")
 
 def onEnable():
     LoadSettings()
