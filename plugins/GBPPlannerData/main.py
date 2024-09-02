@@ -140,8 +140,7 @@ def plugin(data):
                             override_data.append({
                                 'timestamp': time.time(),
                                 'next_speed': next_speed,
-                                'distance': distance,
-                                'truck_id': truck.get('robot_id')
+                                'distance': distance
                             })
                 
                 if not override_cruise_control and last_override_state:
@@ -218,7 +217,7 @@ def export_override_data():
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
         with open(filepath, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=['timestamp', 'next_speed', 'distance', 'truck_id'])
+            writer = csv.DictWriter(f, fieldnames=['timestamp', 'next_speed', 'distance'])
             writer.writeheader()
             writer.writerows(override_data)
         
