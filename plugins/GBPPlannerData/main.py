@@ -144,7 +144,7 @@ def plugin(data):
                                 truck_y = truck_position.get('y', 0)
                                 distance = ((truck_x - position_x)**2 + (truck_y - position_y)**2)**0.5
                                 override_data.append({
-                                    'timestamp': timestep,
+                                    'timestep': timestep,
                                     'next_speed': next_speed,
                                     'distance': distance,
                                     'latency': latency
