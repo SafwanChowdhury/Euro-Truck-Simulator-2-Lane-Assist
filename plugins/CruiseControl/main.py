@@ -279,11 +279,12 @@ def plugin(data):
             # if required_speed_kmh > speedlimit + 10:
             #     required_speed_kmh = speedlimit + 10
 
-            if required_speed_kmh < 40:
-                required_speed_kmh = 40
+            if required_speed_kmh < 30:
+                required_speed_kmh = 30
             
             # Use the required speed as the target speed
             targetspeed = round(required_speed_kmh, 1)
+            print(f"Required speed: {required_speed_mph}") 
         else:
             # Use the original logic to determine target speed
             if speedlimit != 0 and speedlimit > 0:
@@ -443,6 +444,9 @@ def plugin(data):
                     data["sdk"]["acceleration"] = 0
                     data["sdk"]["brake"] = brake_strength
                     user_emergency_braking_timer = current_time
+                if speed > 30 and targetspeed < speed/2:
+                    data["sdk"]["brake"] = brake_strength
+                    data["sdk"]["acceleration"] = 0
                 elif targetspeed == 0 and abs(speed) < 1 and user_accelerating == False:
                     park_brake_target = True
                 if speed < 30 and targetspeed != 0 and auto_accelerate == True and user_emergency_braking == False and do_lanedetected_stop == False:
