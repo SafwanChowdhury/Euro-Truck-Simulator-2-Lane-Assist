@@ -264,7 +264,7 @@ def plugin(data):
         # Get the required speed and override flag from the external API
 
         # Check if 'externalapi' exists in data
-        if "last" in data and "externalapi" in data["last"] and "receivedJSON" in data["last"]["externalapi"] and "required_speed_mph" in data["last"]["externalapi"]["receivedJSON"] and "override_cruise_control" in data["last"]["externalapi"]["receivedJSON"]:
+        if "last" in data and "externalapi" in data["last"] and "receivedJSON" in data["last"]["externalapi"] and "override_cruise_control" in data["last"]["externalapi"]["receivedJSON"]:
             override_cruise_control = data["last"]["externalapi"]["receivedJSON"]["override_cruise_control"]
         else:
             override_cruise_control = False
@@ -275,12 +275,13 @@ def plugin(data):
             required_speed_kmh = required_speed_mph * 1.60934
             if required_speed_kmh < 0:
                 required_speed_kmh = 0
-            
+            elif required_speed_kmh < 30:
+                required_speed_kmh = 30
+
             # if required_speed_kmh > speedlimit + 10:
             #     required_speed_kmh = speedlimit + 10
 
-            if required_speed_kmh < 30:
-                required_speed_kmh = 30
+            
             
             # Use the required speed as the target speed
             targetspeed = round(required_speed_kmh, 1)
@@ -330,7 +331,7 @@ def plugin(data):
         park_brake = False
         gamepaused = False
 
-    if not override_cruise_control:
+    if override_cruise_control == False:
         if speedlimit != 0 and speedlimit > 0:
             targetspeed = speedlimit
         else:
