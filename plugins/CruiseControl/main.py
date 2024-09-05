@@ -446,7 +446,7 @@ def plugin(data):
                     data["sdk"]["brake"] = brake_strength
                     user_emergency_braking_timer = current_time
                 if speed > 30 and targetspeed < speed/2:
-                    data["sdk"]["brake"] = brake_strength
+                    data["sdk"]["brake"] = brake_strength * 0.1
                     data["sdk"]["acceleration"] = 0
                 elif targetspeed == 0 and abs(speed) < 1 and user_accelerating == False:
                     park_brake_target = True
