@@ -2,6 +2,33 @@
 
 # Multi-Agent Platooning using Gaussian Belief Propagation
 
+## Contents
+
+- [Multi-Agent Platooning using Gaussian Belief Propagation](#multi-agent-platooning-using-gaussian-belief-propagation)
+  - [Contents](#contents)
+  - [GBPPlanner for Multi-Agent Platooning](#gbpplanner-for-multi-agent-platooning)
+    - [Initial Setup](#initial-setup)
+    - [Run examples](#run-examples)
+      - [During simulation](#during-simulation)
+    - [Play with the code](#play-with-the-code)
+      - [Own formations](#own-formations)
+      - [Custom Obstacles](#custom-obstacles)
+    - [Cite the original paper](#cite-the-original-paper)
+  - [GBPPlanner for ETS2LA](#gbpplanner-for-ets2la)
+    - [Initial Setup](#initial-setup-1)
+    - [Run examples](#run-examples-1)
+    - [Adding External Trucks](#adding-external-trucks)
+      - [During simulation](#during-simulation-1)
+    - [Play with the code](#play-with-the-code-1)
+      - [Custom Obstacles](#custom-obstacles-1)
+  - [Euro Truck Simulator 2 Lane Assist](#euro-truck-simulator-2-lane-assist)
+    - [Installer](#installer)
+    - [Initial Setup](#initial-setup-2)
+    - [Game Setup](#game-setup)
+    - [ETS2LA Setup](#ets2la-setup)
+    - [Links](#links)
+
+
 ## GBPPlanner for Multi-Agent Platooning
 This project builds upon the GBPPlanner framework discussed in the the 2023 Robotics Automation Letters (RA-L) paper. It was also presented at ICRA 2023 (Oral).
 
